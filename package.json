@@ -6,7 +6,7 @@
   "overrides": { "multer": "^2.3.0" },
   "scripts": {
     "build": "npm run build -w @loop/types && npm run build -w @loop/api && npm run build -w @loop/web",
-    "lint": "npm run lint --workspaces && eslint scripts tests *.ts *.mjs && node --import tsx scripts/check-vocabulary.ts",
+    "lint": "npm run lint --workspaces && eslint scripts tests *.ts *.mjs && node --import tsx scripts/check-vocabulary.ts && node --import tsx scripts/check-prose.ts",
     "test": "npm run build -w @loop/types && npm run test --workspaces",
     "dev": "npm run build -w @loop/types && concurrently -k -n types,api,web \"npm run dev -w @loop/types\" \"npm run dev -w @loop/api\" \"npm run dev -w @loop/web\"",
     "test:e2e": "playwright test"

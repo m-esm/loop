@@ -235,8 +235,10 @@ assertion passes in the final run. Only one database page is held per stream.
   are documented in README. No response compression middleware is installed;
   SSE sets identity encoding, no-transform and X-Accel-Buffering: no.
 - Next dev generated AGENTS.md and CLAUDE.md containing prohibited punctuation.
-  They were removed after verification; no dependency files were modified.
-  The installed Next documentation was consulted.
+  They are deleted, gitignored, and `scripts/check-prose.ts` now fails lint if
+  an em dash reappears in any tracked file, so regeneration cannot slip through
+  review again. No dependency files were modified. The installed Next
+  documentation was consulted.
 
 ## Dependency audit and invariants
 
