@@ -1,0 +1,19 @@
+{
+  "name": "@loop/web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1",
+    "build": "next build",
+    "start": "next start --hostname 127.0.0.1",
+    "lint": "eslint app components lib test",
+    "test": "node --import tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@loop/types": "0.0.0",
+    "next": "16.3.4",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": { "@types/react": "^19.2.14", "@types/react-dom": "^19.2.3" }
+}

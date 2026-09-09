@@ -25,3 +25,7 @@ pnpm-debug.log*
 .cache/
 tmp/
 .remember
+*.sqlite-wal
+*.sqlite-shm
+playwright-report/
+test-results/

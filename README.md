@@ -20,15 +20,82 @@ Not a Discord bot and not Hermes. Own UI, own runtime, own task store.
 - [`UI.md`](UI.md) every view and component
 - [`REUSE.md`](REUSE.md) what to copy or port, with paths and verdicts
 
-## Stack
+## Run locally
 
-TypeScript throughout. NestJS API, Next.js frontend, SQLite to start, SSE for
-live events.
+Use Node 22 (see `.nvmrc`) and npm workspaces.
 
-## Status
+```sh
+npm ci
+npm run dev
+```
 
-Bootstrapping. The monorepo skeleton (`apps/api`, `apps/web`,
-`packages/types`) lands next, then the task store, event bus, and live feed.
+Open http://localhost:3000 in two tabs. Create a task in one tab and watch it
+appear in the other. The API listens on `127.0.0.1:3001`. Both apps bind only
+to the local machine. This bootstrap has one room and no authentication.
+
+The store uses **Drizzle ORM with better-sqlite3**. Checked-in migrations in
+`apps/api/migrations` run at API startup. The default database is
+`apps/api/data/loop.sqlite` when using the workspace commands. Set
+`DATABASE_PATH` to an absolute path to use another database.
+
+`packages/types/src/task-status.ts` is the only status vocabulary. The API
+schema, validators, helpers, and UI derive their types and classifications
+from it. `npm run lint` also rejects mirrored status arrays and unions.
+
+## Verify
+
+```sh
+npm run lint
+npm run test
+npm run build
+npm run test:e2e
+npm audit
+```
+
+The browser test requires Playwright Chromium (`npx playwright install chromium`
+on a new machine). Run `npm run test` or `npm run build` first to compile the
+API. The browser test owns ports 3100 and 3101, uses a temporary SQLite file,
+kills and restarts its API, and captures `docs/screenshots/tasks-list.png`.
+See [EVIDENCE.md](EVIDENCE.md) for the recorded run.
+
+## Data flow
+
+`GET /api/tasks` returns `{ tasks, since }` from one database snapshot.
+The client subscribes to `GET /api/stream?since=<id>` after loading that snapshot.
+Events contain full task rows, so creates and changes update the list in place
+without polling or re-fetching it. Reconnects use jittered exponential backoff,
+wait while the tab is hidden, and resume from the last accepted event id.
+
+`POST /api/tasks` accepts `title`, `owner`, and `definitionOfDone`.
+`GET /api/tasks/:id` reads a single task. `PATCH /api/tasks/:id/status` accepts
+`{ "status": <value from the shared vocabulary> }`. Unknown statuses and invalid
+input return 400; missing tasks return 404. Status changes currently accept any
+shared status; runner-owned transition policy is outside this bootstrap.
+
+The bus's `emitEvent` is the single event insert/publication path. It wraps the
+task mutation and event insertion in a SQLite transaction, commits, then
+publishes the returned row. Replay is ordered and drains all missed events in
+pages. The stream emits a 25-second heartbeat comment and disables proxy
+buffering and compression. This in-process bus supports one API process;
+multiple API processes would need a shared publication mechanism.
+
+`PORT` and `WEB_ORIGIN` configure the API. `NEXT_PUBLIC_API_URL` configures the
+browser API base URL at build or dev startup. Its default is
+`http://127.0.0.1:3001/api`; the API allows both localhost and 127.0.0.1
+on the default web port. Keep these aligned when using other ports or hosts.
+
+## Reuse
+
+The status helpers, bus, stream route, and client feed port the 3DVP sources
+listed in [REUSE.md](REUSE.md). The status metadata replaces duplicate lists;
+the bus adds an atomic task/event transaction; replay drains all pages; the
+client preserves the original jitter, visibility deferral and bounded id set.
+The provider manifest was reviewed for its single-source pattern. Agent
+selection and runner integration are outside this task, so no unused provider
+or model list is introduced.
+
+The root Multer override selects the patched 2.3 release while Nest's adapter
+pins an older release. See the [upstream advisory](https://github.com/advisories/GHSA-wc9g-mqfw-jrwm).
 
 ## License
 
