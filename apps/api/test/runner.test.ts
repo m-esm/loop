@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setImmediate as defer } from 'node:timers';
@@ -12,11 +12,25 @@ import { TaskRunner } from '../src/runner';
 import { MessageStore } from '../src/message-store';
 
 const input = { title: 'Echo me', owner: 'Human', definitionOfDone: 'proof' };
+const originalAgentsPath = process.env.LOOP_AGENTS_PATH;
+const originalWallMs = process.env.LOOP_WALL_MS;
 let database: Database;
 let bus: EventBus;
 let store: TaskStore;
 let runner: TaskRunner;
 let dir: string | undefined;
+
+function nodeCommand(script: string): string[] {
+  return [process.execPath, '-e', script];
+}
+
+function rebuildRunner(agents: { id: string; name: string; command: string[] }[]) {
+  const path = join(dir!, 'agents.json');
+  writeFileSync(path, JSON.stringify({ agents }));
+  process.env.LOOP_AGENTS_PATH = path;
+  runner.stop();
+  runner = new TaskRunner(store, bus);
+}
 
 async function waitFor(check: () => boolean, ms = 5000) {
   const start = Date.now();
@@ -41,6 +55,10 @@ afterEach(async () => {
   await new Promise((resolve) => defer(resolve));
   database.onModuleDestroy();
   if (dir) rmSync(dir, { recursive: true, force: true });
+  if (originalAgentsPath === undefined) delete process.env.LOOP_AGENTS_PATH;
+  else process.env.LOOP_AGENTS_PATH = originalAgentsPath;
+  if (originalWallMs === undefined) delete process.env.LOOP_WALL_MS;
+  else process.env.LOOP_WALL_MS = originalWallMs;
 });
 
 test('echo runner claims a queued task and finishes with log and result', async () => {
@@ -154,4 +172,104 @@ test('claim is deferred so a /task message stays task_created then message_creat
   if (message.body.kind !== 'task') throw new Error('expected task card');
   const taskId = message.body.taskId;
   await waitFor(() => store.get(taskId).status === 'done');
+});
+
+test('a configured command\'s stdout is the done result', async () => {
+  const token = `stdout-${Date.now()}`;
+  rebuildRunner([{ id: 'probe', name: 'Probe', command: nodeCommand(`process.stdout.write(${JSON.stringify(`${token}\n`)})`) }]);
+  const task = store.create(input);
+  runner.start();
+  await waitFor(() => store.get(task.id).status === 'done');
+  const done = store.get(task.id);
+  assert.equal(done.result, token);
+  assert.ok(done.log.includes(token));
+  assert.equal(done.error, null);
+});
+
+test('a nonzero command\'s stderr is the failed error', async () => {
+  const token = `stderr-${Date.now()}`;
+  rebuildRunner([{
+    id: 'probe', name: 'Probe',
+    command: nodeCommand(`process.stderr.write(${JSON.stringify(`${token}\n`)}); process.exit(2)`),
+  }]);
+  const task = store.create(input);
+  runner.start();
+  await waitFor(() => store.get(task.id).status === 'failed');
+  const failed = store.get(task.id);
+  assert.equal(failed.error, token);
+  assert.ok(failed.log.includes(token));
+  assert.equal(failed.result, null);
+});
+
+test('empty stdout on exit 0 uses Exited 0; empty stderr on nonzero uses Exited code', async () => {
+  rebuildRunner([{ id: 'probe', name: 'Probe', command: nodeCommand('process.exit(0)') }]);
+  const ok = store.create({ ...input, title: 'silent ok' });
+  runner.start();
+  await waitFor(() => store.get(ok.id).status === 'done');
+  assert.equal(store.get(ok.id).result, 'Exited 0');
+  runner.stop();
+  rebuildRunner([{ id: 'probe', name: 'Probe', command: nodeCommand('process.exit(3)') }]);
+  const bad = store.create({ ...input, title: 'silent fail' });
+  runner.start();
+  await waitFor(() => store.get(bad.id).status === 'failed');
+  assert.equal(store.get(bad.id).error, 'Exited 3');
+});
+
+test('partial stdout without a trailing newline is flushed on exit', async () => {
+  rebuildRunner([{
+    id: 'probe', name: 'Probe',
+    command: nodeCommand("process.stdout.write('hel'); process.stdout.write('lo')"),
+  }]);
+  const task = store.create(input);
+  runner.start();
+  await waitFor(() => store.get(task.id).status === 'done');
+  assert.equal(store.get(task.id).result, 'hello');
+  assert.ok(store.get(task.id).log.includes('hello'));
+});
+
+test('missing agents file leaves tasks queued', async () => {
+  process.env.LOOP_AGENTS_PATH = join(dir!, 'missing-agents.json');
+  runner.stop();
+  runner = new TaskRunner(store, bus);
+  const task = store.create(input);
+  runner.start();
+  await new Promise((resolve) => defer(resolve));
+  await new Promise((resolve) => defer(resolve));
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(store.get(task.id).status, 'queued');
+});
+
+test('wall clock kills a hung child and clears busy for the next task', async () => {
+  process.env.LOOP_WALL_MS = '200';
+  rebuildRunner([{
+    id: 'probe', name: 'Probe',
+    command: nodeCommand("setTimeout(() => process.stdout.write('too late\\n'), 10000)"),
+  }]);
+  const hung = store.create({ ...input, title: 'hang' });
+  runner.start();
+  await waitFor(() => store.get(hung.id).status === 'failed');
+  const failed = store.get(hung.id);
+  assert.equal(failed.error, 'timed out');
+  assert.equal(failed.log.includes('too late'), false);
+  rebuildRunner([{ id: 'probe', name: 'Probe', command: nodeCommand("process.stdout.write('next\\n')") }]);
+  const next = store.create({ ...input, title: 'after hang' });
+  runner.start();
+  await waitFor(() => store.get(next.id).status === 'done');
+  assert.equal(store.get(next.id).result, 'next');
+});
+
+test('LOOP_ASK line parks, then reruns with LOOP_TASK_ANSWER', async () => {
+  rebuildRunner([{
+    id: 'probe', name: 'Probe',
+    command: nodeCommand(
+      "const a=process.env.LOOP_TASK_ANSWER;if(a){process.stdout.write('got '+a+'\\n')}else{process.stdout.write('LOOP_ASK: colour?\\n')}",
+    ),
+  }]);
+  const task = store.create(input);
+  runner.start();
+  await waitFor(() => store.get(task.id).status === 'needs_input');
+  assert.equal(store.get(task.id).question, 'colour?');
+  store.answer(task.id, 'green', 'Moshe');
+  await waitFor(() => store.get(task.id).status === 'done');
+  assert.equal(store.get(task.id).result, 'got green');
 });

@@ -1,0 +1,13 @@
+{
+  "agents": [
+    {
+      "id": "echo",
+      "name": "Echo",
+      "command": [
+        "node",
+        "-e",
+        "const t=process.env.LOOP_TASK_TITLE||'';const a=process.env.LOOP_TASK_ANSWER;if(t.startsWith('ASK:')){if(a){process.stdout.write('Answered: '+a+'\\n')}else{process.stdout.write('LOOP_ASK: '+(t.slice(4).trim()||t)+'\\n')}}else if(t.startsWith('FAIL:')){process.stdout.write('Echo started\\nEcho failed\\n');process.stderr.write((t.slice(5).trim()||t)+'\\n');process.exit(1)}else{process.stdout.write('Echo started\\nEcho working\\nEcho finished\\nEcho: '+t+'\\n')}"
+      ]
+    }
+  ]
+}
