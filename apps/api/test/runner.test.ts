@@ -230,16 +230,14 @@ test('partial stdout without a trailing newline is flushed on exit', async () =>
   assert.ok(store.get(task.id).log.includes('hello'));
 });
 
-test('missing agents file leaves tasks queued', async () => {
+test('missing agents file fails a queued task because the room has no runnable agents', async () => {
   process.env.LOOP_AGENTS_PATH = join(dir!, 'missing-agents.json');
   runner.stop();
   runner = new TaskRunner(store, bus, messages);
   const task = store.create(input);
   runner.start();
-  await new Promise((resolve) => defer(resolve));
-  await new Promise((resolve) => defer(resolve));
-  await new Promise((resolve) => setTimeout(resolve, 50));
-  assert.equal(store.get(task.id).status, 'queued');
+  await waitFor(() => store.get(task.id).status === 'failed');
+  assert.equal(store.get(task.id).error, 'This room has no agents.');
 });
 
 test('wall clock kills a hung child and clears busy for the next task', async () => {

@@ -252,7 +252,7 @@ function generate(): string {
     '## Tree notes',
     '',
     'The runner loads `agents.json` (`LOOP_AGENTS_PATH`, default repo root) at API start and spawns with `shell: false`.',
-    'A task with `agentId` runs that agent\'s command. An unassigned task still uses the first configured agent. An unknown id is claimed then failed through `store.finish`; it is not skipped.',
+    'A room owner picks an agent from that catalog; the command never comes from the request. `task.agentId` is the room mention name, resolved through `room_agents` for that room only, then mapped to the catalog command. An unassigned task uses the first room agent whose catalog id is present. An unknown mention or catalog id is claimed then failed through `store.finish`; a room with no runnable agents fails with a message saying so.',
     'Stdout and stderr stream into the task log. Exit 0 finishes `done` with the last nonempty stdout line; nonzero fails with the last nonempty stderr line.',
     'An agent asks by writing a `LOOP_ASK:` line; the runner parks the task in `needs_input` and reruns the same agent with `LOOP_TASK_ANSWER` after a human answers.',
     'An agent proposes by writing a `LOOP_PROPOSE:` JSON line; the runner parks the task in `needs_input` and reruns with `LOOP_TASK_CHOICE` after a human decides. A malformed proposal fails the task.',
@@ -267,6 +267,7 @@ function generate(): string {
     'Migration `0006_task_proposal.sql` adds nullable `proposal`, `proposal_choice`, and `proposal_by`.',
     'Migration `0007_task_parent.sql` adds nullable `parent_task_id` referencing `tasks(id)`.',
     'Migration `0008_auth.sql` adds `principals`, `credentials`, `sessions`, and `room_members`, plus nullable `*_principal_id` columns next to the legacy attribution strings.',
+    'Migration `0009_room_agents.sql` adds `room_agents` (catalog id, mention name, no command) unique on `(room_id, name)`, and seeds echo and reviewer into the default room.',
     'A global guard requires a live `loop_session` cookie except on register, login, and health. Attribution is stamped from the session, not the request body. Agents get principals at boot and never get a session.',
     '',
   ];

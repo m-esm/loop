@@ -6,6 +6,7 @@ import { Database } from './database';
 import { EventBus } from './bus';
 import { events, tasks } from './schema';
 import { roomId } from './field';
+import { assertKnownRoom } from './room-agents';
 
 export const LOG_MAX_LINES = 200;
 export const LOG_MAX_CHARS = 500;
@@ -68,6 +69,7 @@ export class TaskStore {
       const ts = new Date().toISOString();
       const id = randomUUID();
       const room = roomId(input.roomId ?? 'default');
+      assertKnownRoom(this.database, room);
       const parentTaskId = input.parentTaskId ?? null;
       if (parentTaskId) {
         assertParentLink(id, parentTaskId);

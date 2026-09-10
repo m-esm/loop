@@ -12,6 +12,7 @@ export default function Page() {
       <Room />
     </main>
     <aside className="context" aria-label="Context panel">
+      <div id="room-agents" />
       <h2>Task context</h2><div id="task-context"><p>Select a task to see its owner and definition of done.</p></div>
       <p className="muted">Task changes appear live across open tabs.</p>
     </aside>

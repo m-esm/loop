@@ -1,0 +1,86 @@
+'use client';
+
+import { useEffect, useState, type FormEvent } from 'react';
+import { createPortal } from 'react-dom';
+import type { RoomAgent, RoomAgentsSnapshot } from '@loop/types';
+import { api } from '../lib/api';
+
+export default function RoomAgents({ room }: { room: string }) {
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  const [snapshot, setSnapshot] = useState<RoomAgentsSnapshot | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setHost(document.getElementById('room-agents')); }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    api<RoomAgentsSnapshot>(`/rooms/${room}/agents`, { signal: controller.signal })
+      .then((value) => { setSnapshot(value); setError(''); })
+      .catch((err: Error) => { if (!controller.signal.aborted) setError(err.message); });
+    return () => controller.abort();
+  }, [room]);
+  async function refresh() {
+    const value = await api<RoomAgentsSnapshot>(`/rooms/${room}/agents`);
+    setSnapshot(value);
+    setError('');
+  }
+  async function add(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setBusy(true);
+    setError('');
+    try {
+      await api<RoomAgent>(`/rooms/${room}/agents`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ catalogId: data.get('catalogId'), name: data.get('name') }),
+      });
+      form.reset();
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Agent could not be added.');
+    } finally { setBusy(false); }
+  }
+  async function remove(id: string) {
+    setBusy(true);
+    setError('');
+    try {
+      await api(`/rooms/${room}/agents/${id}`, { method: 'DELETE' });
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Agent could not be removed.');
+    } finally { setBusy(false); }
+  }
+  if (!host) return null;
+  if (!snapshot) {
+    if (!error) return null;
+    return createPortal(<p role="alert">{error}</p>, host);
+  }
+  const owner = snapshot.role === 'owner';
+  return createPortal(
+    <section aria-label="Room agents" className="room-agents">
+      <h2>Agents</h2>
+      {snapshot.agents.length === 0
+        ? <p className="muted">No agents in this room.</p>
+        : <ul>{snapshot.agents.map((agent) => <li key={agent.id}>
+          <span>@{agent.name}</span>
+          <span className="muted">{agent.catalogId}</span>
+          {owner
+            ? <button type="button" disabled={busy} onClick={() => { void remove(agent.id); }}>Remove</button>
+            : null}
+        </li>)}</ul>}
+      {owner && <form aria-label="Add agent" onSubmit={(event) => { void add(event); }}>
+        <label>Catalog
+          <select name="catalogId" required disabled={busy}>
+            {snapshot.catalog.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </select>
+        </label>
+        <label>Name
+          <input name="name" required maxLength={100} pattern="[A-Za-z0-9_-]+" disabled={busy} />
+        </label>
+        <button type="submit" disabled={busy}>{busy ? 'Saving...' : 'Add'}</button>
+      </form>}
+      {error && <p role="alert">{error}</p>}
+    </section>,
+    host,
+  );
+}

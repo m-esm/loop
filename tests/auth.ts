@@ -32,6 +32,8 @@ export function withAuth(request: APIRequestContext, token: string) {
       request.post(url, { ...options, headers: { ...headers, ...(options?.headers as Record<string, string> | undefined) } }),
     patch: (url: string, options?: Parameters<APIRequestContext['patch']>[1]) =>
       request.patch(url, { ...options, headers: { ...headers, ...(options?.headers as Record<string, string> | undefined) } }),
+    delete: (url: string, options?: Parameters<APIRequestContext['delete']>[1]) =>
+      request.delete(url, { ...options, headers: { ...headers, ...(options?.headers as Record<string, string> | undefined) } }),
   };
 }
 

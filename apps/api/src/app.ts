@@ -13,13 +13,17 @@ import { AuthService } from './auth';
 import { AuthGuard } from './auth.guard';
 import { AuthController } from './auth.controller';
 import { HealthController } from './health.controller';
+import { RoomAgentStore } from './room-agents';
+import { RoomsController } from './rooms.controller';
 
 @Module({
   providers: [
-    Database, EventBus, TaskStore, MessageStore, TaskRunner, AuthService,
+    Database, EventBus, TaskStore, MessageStore, TaskRunner, AuthService, RoomAgentStore,
     { provide: APP_GUARD, useClass: AuthGuard },
   ],
-  controllers: [TasksController, StreamController, MessagesController, AuthController, HealthController],
+  controllers: [
+    TasksController, StreamController, MessagesController, AuthController, HealthController, RoomsController,
+  ],
 })
 class AppModule {}
 
