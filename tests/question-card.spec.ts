@@ -50,6 +50,12 @@ test('question card answers in the browser and the same task reaches done', asyn
     await expect(colourCard.locator('.tp-chip')).toHaveText('needs_input', { timeout: 10_000 });
     await expect(colourCard.locator('[data-task-question]')).toHaveText('what colour');
     await expect(colourCard).toHaveClass(/question-card/);
+    const rail = page.locator('[data-needs-human]');
+    await expect(rail).toHaveAttribute('data-needs-human', '1');
+    await expect(rail.locator('.needs-human-pill')).toHaveText('1');
+    await expect(rail.locator('.needs-human-pill')).toHaveAttribute('aria-label', '1 task needs a human');
+    await expect(page).toHaveTitle(/^\(1\) /);
+    await expect(page).toHaveTitle(/^\(1\) /);
 
     await page.getByLabel('Message', { exact: true }).fill('/task ASK: what shape :: proof');
     const secondPost = page.waitForResponse((response) => response.url().endsWith('/messages') && response.request().method() === 'POST');
@@ -58,6 +64,10 @@ test('question card answers in the browser and the same task reaches done', asyn
     const shapeCard = page.locator('.chat-task').filter({ hasText: 'ASK: what shape' });
     await expect(shapeCard.locator('.tp-chip')).toHaveText('needs_input', { timeout: 10_000 });
     await expect(shapeCard.locator('[data-task-question]')).toHaveText('what shape');
+    await expect(rail).toHaveAttribute('data-needs-human', '2');
+    await expect(rail.locator('.needs-human-pill')).toHaveText('2');
+    await expect(rail.locator('.needs-human-pill')).toHaveAttribute('aria-label', '2 tasks need a human');
+    await expect(page).toHaveTitle(/^\(2\) /);
 
     await colourCard.getByLabel('Answer').fill('blue');
     const answered = page.waitForResponse((response) => response.url().includes('/answer') && response.request().method() === 'POST');
@@ -70,12 +80,25 @@ test('question card answers in the browser and the same task reaches done', asyn
     await expect(colourCard.locator('[data-task-result]')).toHaveText('Answered: blue');
     await expect(shapeCard.locator('.tp-chip')).toHaveText('needs_input');
     await expect(shapeCard).toHaveClass(/question-card/);
+    await expect(rail).toHaveAttribute('data-needs-human', '1');
+    await expect(rail.locator('.needs-human-pill')).toHaveText('1');
+    await expect(page).toHaveTitle(/^\(1\) /);
     // A pinned question is useless if you cannot reach its submit button.
     // toBeInViewport alone passes on a sliver, so assert the whole control.
     await expect(shapeCard.getByLabel('Answer')).toBeInViewport({ ratio: 1 });
     await expect(shapeCard.getByRole('button', { name: 'Submit answer', exact: true })).toBeInViewport({ ratio: 1 });
 
     await page.screenshot({ path: resolve('docs/screenshots/room-chat.png') });
+
+    await shapeCard.getByLabel('Answer').fill('circle');
+    const answeredShape = page.waitForResponse((response) => response.url().includes('/answer') && response.request().method() === 'POST');
+    await shapeCard.getByRole('button', { name: 'Submit answer', exact: true }).click();
+    expect((await answeredShape).status()).toBe(200);
+    await expect(shapeCard.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
+    await expect(rail).toHaveAttribute('data-needs-human', '0');
+    await expect(page).not.toHaveTitle(/^\(\d+\) /);
+    await expect(rail.locator('.needs-human-pill')).toHaveCount(0);
+    await expect(page).not.toHaveTitle(/^\(\d+\) /);
   } finally {
     await Promise.all(contexts.map((context) => context.close()));
     await stopApi();

@@ -4,7 +4,7 @@ export default function Page() {
   return <div className="shell">
     <aside className="projects" aria-label="Projects">
       <h1>Loop</h1><p className="muted">Projects</p>
-      <a href="/" aria-current="page">Loop</a>
+      <div id="projects-rail" />
     </aside>
     <main>
       <header><p className="muted">Project room</p><h2>Loop</h2>

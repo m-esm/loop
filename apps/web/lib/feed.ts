@@ -8,6 +8,11 @@ export function sseBackoffDelay(attempt: number): number {
 
 export interface RoomFeed { tasks: Task[]; messages: Message[] }
 
+/** Count parked tasks, not question cards. One task is one badge. */
+export function needsHumanCount(tasks: Task[]): number {
+  return tasks.filter((task) => task.status === 'needs_input').length;
+}
+
 export function applyTaskEvent(state: RoomFeed, event: TaskEvent): RoomFeed {
   if (event.kind === 'message_created') {
     const message = event.payload.message;

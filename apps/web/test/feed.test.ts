@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { INITIAL_STATUS, TASK_STATUSES, type Task, type TaskEvent } from '@loop/types';
-import { applyTaskEvent, sseBackoffDelay } from '../lib/feed';
+import { applyTaskEvent, needsHumanCount, sseBackoffDelay } from '../lib/feed';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
 import MessageCard from '../components/MessageCard';
@@ -61,6 +61,22 @@ test('task_progress upserts the live log without adding a row', () => {
   }));
   assert.ok(html.includes('Echo started'));
   assert.ok(html.includes('Echo: Build'));
+});
+
+test('needsHumanCount counts parked tasks, not cards, and drops when answered', () => {
+  assert.equal(needsHumanCount([]), 0);
+  assert.equal(needsHumanCount([taskOf(), taskOf({ id: 'run', status: 'running' })]), 0);
+  const parkedA = taskOf({ id: 'a', status: 'needs_input', question: 'colour?' });
+  const parkedB = taskOf({ id: 'b', status: 'needs_input', question: 'shape?' });
+  const done = taskOf({ id: 'c', status: 'done' });
+  assert.equal(needsHumanCount([parkedA, parkedB, done]), 2);
+  const withCards = { tasks: [parkedA], messages: [] };
+  assert.equal(needsHumanCount(withCards.tasks), 1);
+  const afterAnswer = applyTaskEvent(withCards, {
+    id: 9, room_id: 'default', subject_id: parkedA.id, ts: '', kind: 'task_status_changed',
+    payload: { task: { ...parkedA, status: 'queued', question: null, answer: 'blue' }, previousStatus: 'needs_input' },
+  });
+  assert.equal(needsHumanCount(afterAnswer.tasks), 0);
 });
 
 test('jitter stays within the exponential envelope and 30 second cap', () => {
