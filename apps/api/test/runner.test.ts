@@ -301,6 +301,29 @@ test('the child gets an allowlisted env and a cwd outside the API, not the serve
   }
 });
 
+test('rejected rerun passes LOOP_TASK_NOTE to the child', async () => {
+  rebuildRunner([{
+    id: 'probe', name: 'Probe',
+    command: nodeCommand(
+      "const n=process.env.LOOP_TASK_NOTE;if(n){process.stdout.write('note '+n+'\\n')}else{process.stdout.write('first\\n')}",
+    ),
+  }]);
+  const task = store.create(input);
+  runner.start();
+  await waitFor(() => store.get(task.id).status === 'done');
+  assert.equal(store.get(task.id).result, 'first');
+  store.review(task.id, 'rejected', 'too thin', 'Moshe');
+  await waitFor(() => store.get(task.id).status === 'done' && store.get(task.id).result === 'note too thin');
+  const done = store.get(task.id);
+  assert.equal(done.result, 'note too thin');
+  // The re-run is a new unreviewed result, so the verdict that sent it back is
+  // gone. A surviving verdict would hide Accept/Reject on the fresh output.
+  assert.equal(done.verdict, null);
+  assert.equal(done.verdictNote, null);
+  assert.equal(done.verdictBy, null);
+  assert.equal(done.agentId, null);
+});
+
 test('a named agent runs its own command and claimedBy is that id', async () => {
   rebuildRunner([
     { id: 'echo', name: 'Echo', command: nodeCommand("process.stdout.write('from-echo\\n')") },

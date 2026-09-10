@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { and, desc, eq, inArray } from 'drizzle-orm';
-import { INITIAL_STATUS, TASK_STATUSES, isRunningStatus, type CreateTask, type TaskSnapshot, type TaskStatus } from '@loop/types';
+import { INITIAL_STATUS, TASK_STATUSES, isActiveStatus, isRunningStatus, isTaskVerdict, type CreateTask, type TaskSnapshot, type TaskStatus } from '@loop/types';
 import { Database } from './database';
 import { EventBus } from './bus';
 import { events, tasks } from './schema';
@@ -123,9 +123,13 @@ export class TaskStore {
     try {
       const event = this.bus.emitEvent(() => {
         const ts = new Date().toISOString();
+        // A verdict belongs to the run it judged. A rejected task that re-runs
+        // and finishes again is unreviewed, so a stale verdict would hide the
+        // buttons forever. Same staleness rule as result and error.
+        const cleared = { verdict: null, verdictNote: null, verdictBy: null };
         const fields = outcome.status === 'done'
-          ? { status: outcome.status, result: outcome.result, error: null, updatedAt: ts }
-          : { status: outcome.status, error: outcome.error, result: null, updatedAt: ts };
+          ? { status: outcome.status, result: outcome.result, error: null, updatedAt: ts, ...cleared }
+          : { status: outcome.status, error: outcome.error, result: null, updatedAt: ts, ...cleared };
         const task = this.database.db.update(tasks).set(fields)
           .where(and(eq(tasks.id, id), eq(tasks.status, 'running'), eq(tasks.runId, runId))).returning().get();
         if (!task) {
@@ -177,6 +181,34 @@ export class TaskStore {
       return {
         subject_id: id, room_id: task.roomId, ts, kind: 'task_status_changed',
         payload: { task, previousStatus: 'needs_input' },
+      };
+    });
+    if (event.kind !== 'task_status_changed') throw new Error('Unexpected event kind');
+    return event.payload.task;
+  }
+
+  review(id: string, verdict: string, note: string | undefined, reviewedBy: string) {
+    const event = this.bus.emitEvent(() => {
+      if (!isTaskVerdict(verdict)) throw new BadRequestException('Invalid verdict');
+      const current = this.get(id);
+      if (isActiveStatus(current.status)) throw new BadRequestException('Task is not finished');
+      const ts = new Date().toISOString();
+      const verdictFields = {
+        verdict, verdictNote: note ?? null, verdictBy: reviewedBy, updatedAt: ts,
+      };
+      const fields = verdict === 'accepted' ? verdictFields : {
+        ...verdictFields,
+        status: INITIAL_STATUS,
+        runId: null,
+        claimedBy: null,
+        result: null,
+        error: null,
+      };
+      const task = this.database.db.update(tasks).set(fields)
+        .where(eq(tasks.id, id)).returning().get()!;
+      return {
+        subject_id: id, room_id: task.roomId, ts, kind: 'task_status_changed',
+        payload: { task, previousStatus: current.status },
       };
     });
     if (event.kind !== 'task_status_changed') throw new Error('Unexpected event kind');

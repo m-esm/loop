@@ -189,3 +189,73 @@ test('replay of since=0 matches GET task and never goes done then running', () =
   assert.equal(live.status, 'done');
   assert.equal(live.result, 'ok');
 });
+
+test('accept leaves status and run fields alone', () => {
+  const task = store.create(input);
+  const claimed = store.claim(task.id, 'echo')!;
+  store.finish(claimed.id, claimed.runId!, { status: 'done', result: 'ok' });
+  const before = bus.latestId();
+  const accepted = store.review(task.id, 'accepted', undefined, 'Moshe');
+  assert.equal(accepted.status, 'done');
+  assert.equal(accepted.result, 'ok');
+  assert.equal(accepted.runId, claimed.runId);
+  assert.equal(accepted.claimedBy, 'echo');
+  assert.equal(accepted.error, null);
+  assert.equal(accepted.verdict, 'accepted');
+  assert.equal(accepted.verdictNote, null);
+  assert.equal(accepted.verdictBy, 'Moshe');
+  const added = bus.since(before);
+  assert.deepEqual(added.map((event) => event.kind), ['task_status_changed']);
+  if (added[0].kind !== 'task_status_changed') throw new Error('expected status change');
+  assert.equal(added[0].payload.previousStatus, 'done');
+  assert.equal(added[0].payload.task.status, 'done');
+});
+
+test('reject requeues and clears runId, result, and error', () => {
+  const task = store.create({ ...input, agentId: 'echo' });
+  const claimed = store.claim(task.id, 'echo')!;
+  store.finish(claimed.id, claimed.runId!, { status: 'failed', error: 'boom' });
+  const before = bus.latestId();
+  const rejected = store.review(task.id, 'rejected', 'try again', 'Moshe');
+  assert.equal(rejected.status, INITIAL_STATUS);
+  assert.equal(rejected.runId, null);
+  assert.equal(rejected.claimedBy, null);
+  assert.equal(rejected.result, null);
+  assert.equal(rejected.error, null);
+  assert.equal(rejected.agentId, 'echo');
+  assert.equal(rejected.verdict, 'rejected');
+  assert.equal(rejected.verdictNote, 'try again');
+  assert.equal(rejected.verdictBy, 'Moshe');
+  const added = bus.since(before);
+  assert.deepEqual(added.map((event) => event.kind), ['task_status_changed']);
+  if (added[0].kind !== 'task_status_changed') throw new Error('expected status change');
+  assert.equal(added[0].payload.previousStatus, 'failed');
+  assert.equal(added[0].payload.task.status, INITIAL_STATUS);
+  assert.throws(() => store.review(task.id, 'accepted', undefined, 'Moshe'), /not finished/);
+  assert.equal(bus.latestId(), before + 1);
+});
+
+test('reviewing an active task throws and writes nothing', () => {
+  const task = store.create(input);
+  const before = bus.latestId();
+  assert.throws(() => store.review(task.id, 'accepted', undefined, 'Moshe'), /not finished/);
+  const claimed = store.claim(task.id, 'echo')!;
+  assert.throws(() => store.review(task.id, 'rejected', 'nope', 'Moshe'), /not finished/);
+  assert.equal(bus.latestId(), before + 1);
+  assert.equal(store.get(task.id).status, 'running');
+  assert.equal(store.get(task.id).verdict, null);
+  store.finish(claimed.id, claimed.runId!, { status: 'done', result: 'ok' });
+});
+
+test('an invalid verdict string throws and writes nothing', () => {
+  const task = store.create(input);
+  const claimed = store.claim(task.id, 'echo')!;
+  store.finish(claimed.id, claimed.runId!, { status: 'done', result: 'ok' });
+  const before = bus.latestId();
+  assert.throws(() => store.review(task.id, 'maybe', undefined, 'Moshe'), /Invalid verdict/);
+  assert.throws(() => store.review(task.id, '__proto__', undefined, 'Moshe'), /Invalid verdict/);
+  assert.equal(bus.latestId(), before);
+  assert.equal(store.get(task.id).status, 'done');
+  assert.equal(store.get(task.id).verdict, null);
+  assert.throws(() => store.review('missing', 'accepted', undefined, 'Moshe'), /Task not found/);
+});

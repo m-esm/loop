@@ -177,6 +177,7 @@ export class TaskRunner implements OnModuleInit, OnModuleDestroy {
         LOOP_TASK_DONE_WHEN: task.definitionOfDone,
       };
       if (task.answer) env.LOOP_TASK_ANSWER = task.answer;
+      if (task.verdictNote) env.LOOP_TASK_NOTE = task.verdictNote;
 
       child = spawn(agent.command[0], agent.command.slice(1), {
         shell: false,

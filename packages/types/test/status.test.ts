@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TASK_STATUS, TASK_STATUSES, ACTIVE_STATUSES, isActiveStatus, isRunningStatus, isTaskStatus, relativeTime } from '../src';
+import { TASK_STATUS, TASK_STATUSES, ACTIVE_STATUSES, isActiveStatus, isRunningStatus, isTaskStatus, isTaskVerdict, relativeTime } from '../src';
 
 test('status helpers derive every classification from the vocabulary', () => {
   for (const status of TASK_STATUSES) {
@@ -12,4 +12,8 @@ test('status helpers derive every classification from the vocabulary', () => {
   assert.equal(isTaskStatus('__proto__'), false);
   assert.equal(isRunningStatus('missing'), false);
   assert.equal(relativeTime('bad date'), '');
+  assert.equal(isTaskVerdict('accepted'), true);
+  assert.equal(isTaskVerdict('rejected'), true);
+  assert.equal(isTaskVerdict('queued'), false);
+  assert.equal(isTaskVerdict('__proto__'), false);
 });

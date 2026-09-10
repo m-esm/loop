@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import type { Message, Task } from '@loop/types';
+import { isActiveStatus, type Message, type Task } from '@loop/types';
 import MessageCard from './MessageCard';
 
 export default function Transcript({ messages, tasks, author }: { messages: Message[]; tasks: Task[]; author: string }) {
@@ -14,10 +14,17 @@ export default function Transcript({ messages, tasks, author }: { messages: Mess
   }, [messages, tasks]);
   // UI.md: a question is pinned until answered. Following alone is not enough.
   // An answered card shrinks when its form unmounts, which leaves `follow` stuck
-  // false, so a later parked card never scrolls into view. Re-arm on a new one.
+  // false, so a later parked card never scrolls into view. Re-pin on every
+  // render while a question waits: a card ABOVE it can grow later (a verdict
+  // form appearing on a finished task) and push the answer form below the fold.
   useEffect(() => {
-    const waiting = tasks.filter((task) => task.status === 'needs_input').map((task) => task.id);
-    const fresh = waiting.some((id) => !pinned.current.has(id));
+    // A finished task with no verdict is also waiting on a human: UI.md counts
+    // "waiting on human acceptance" alongside questions. Both must stay reachable.
+    const waiting = tasks
+      .filter((task) => task.status === 'needs_input'
+        || (!isActiveStatus(task.status) && !task.verdict))
+      .map((task) => task.id);
+    const fresh = waiting.length > 0;
     pinned.current = new Set(waiting);
     if (!fresh) return;
     // After paint: the answer form mounts in this same commit, and scrolling to a
