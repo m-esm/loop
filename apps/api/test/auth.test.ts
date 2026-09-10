@@ -8,6 +8,7 @@ import type { Task, TaskEvent } from '@loop/types';
 import { createApp } from '../src/app';
 import { Database } from '../src/database';
 import { TaskStore } from '../src/task-store';
+import { actor } from '../src/auth';
 import { hashToken } from '../src/auth-crypto';
 import { OPERATOR, seedOperator } from '../src/session-seed';
 import { jsonHeaders, startAuthedApp } from './helpers';
@@ -253,4 +254,13 @@ test('the stream only replays events from rooms the caller belongs to', async ()
     assert.ok(events.some((event) => event.payload && 'task' in event.payload && event.payload.task.title === 'In default'));
     assert.equal(events.some((event) => event.room_id === 'other'), false);
   } finally { await app.close(); }
+});
+
+// The guard covers every non-public route today, so a missing principal only
+// happens if someone adds a route to PUBLIC that still calls actor(). The
+// second layer must refuse rather than invent a human: a fabricated principal
+// would pass requireHuman and sign a decision as a person who never acted.
+test('actor() refuses a request the guard never authenticated', () => {
+  assert.throws(() => actor({} as never), (error: Error) => error.name === 'UnauthorizedException'
+    || error.constructor.name === 'UnauthorizedException');
 });

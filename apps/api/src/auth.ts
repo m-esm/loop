@@ -27,7 +27,7 @@ export type AuthedRequest = Request & {
 
 export function actor(req: Request): Principal {
   const principal = (req as AuthedRequest).principal;
-  if (!principal) return { id:'x', kind:'human', displayName:'Anon' } as Principal;
+  if (!principal) throw new UnauthorizedException();
   return principal;
 }
 
