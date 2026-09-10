@@ -35,6 +35,19 @@ test('mixed replay keeps messages unique and a task card renders the updated tas
   const html = renderToStaticMarkup(createElement(MessageCard, { message: after.messages[0], task: after.tasks[0] }));
   assert.ok(html.includes(TASK_STATUSES.at(-1)!));
   assert.ok(html.includes('Build'));
+  const fileHtml = renderToStaticMarkup(createElement(MessageCard, {
+    message: {
+      id: 'file-card', roomId: 'default', author: 'Human', authorPrincipalId: 'human-1',
+      body: { kind: 'file', fileId: 'file-1' }, createdAt: '',
+    },
+    file: {
+      id: 'file-1', roomId: 'default', name: 'notes.txt', size: 12, contentType: 'text/plain',
+      sha256: 'abc', uploadedBy: 'human-1', createdAt: '',
+    },
+  }));
+  assert.ok(fileHtml.includes('notes.txt'));
+  assert.ok(fileHtml.includes('Download'));
+  assert.ok(fileHtml.includes('data-file-id'));
   const withAgent = renderToStaticMarkup(createElement(TaskCard, {
     task: taskOf({ agentId: 'reviewer' }),
   }));

@@ -45,7 +45,21 @@ export interface CreatedRoomInvite {
   role: 'owner' | 'member';
   token: string;
 }
-export type MessageBody = { kind: 'text'; text: string } | { kind: 'task'; taskId: string };
+export type MessageBody =
+  | { kind: 'text'; text: string }
+  | { kind: 'task'; taskId: string }
+  | { kind: 'file'; fileId: string };
+export interface RoomFile {
+  id: string;
+  roomId: string;
+  name: string;
+  size: number;
+  contentType: string;
+  sha256: string;
+  uploadedBy: string;
+  createdAt: string;
+}
+export interface RoomFilesSnapshot { files: RoomFile[] }
 export interface Message {
   id: string;
   roomId: string;

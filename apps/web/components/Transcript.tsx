@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import { isActiveStatus, type Message, type Task } from '@loop/types';
+import { isActiveStatus, type Message, type RoomFile, type Task } from '@loop/types';
 import MessageCard from './MessageCard';
 
-export default function Transcript({ messages, tasks }: { messages: Message[]; tasks: Task[] }) {
+export default function Transcript({ messages, tasks, files = [] }: {
+  messages: Message[]; tasks: Task[]; files?: RoomFile[];
+}) {
   const container = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
   const pinned = useRef(new Set<string>());
@@ -38,6 +40,7 @@ export default function Transcript({ messages, tasks }: { messages: Message[]; t
     return () => cancelAnimationFrame(frame);
   }, [tasks]);
   const byId = new Map(tasks.map((task) => [task.id, task]));
+  const filesById = new Map(files.map((file) => [file.id, file]));
   return <div className="transcript" ref={container} role="log" aria-label="Room transcript" tabIndex={0}
     onScroll={(event) => {
       const element = event.currentTarget;
@@ -45,6 +48,7 @@ export default function Transcript({ messages, tasks }: { messages: Message[]; t
     }}>
     {!messages.length && <p className="muted">Start the conversation, or use /task to create a task here.</p>}
     {messages.map((message) => <MessageCard key={message.id} message={message} tasks={tasks}
-      task={message.body.kind === 'task' ? byId.get(message.body.taskId) : undefined} />)}
+      task={message.body.kind === 'task' ? byId.get(message.body.taskId) : undefined}
+      file={message.body.kind === 'file' ? filesById.get(message.body.fileId) : undefined} />)}
   </div>;
 }

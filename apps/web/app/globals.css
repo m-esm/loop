@@ -148,5 +148,11 @@ nav .logout { margin-left: 12px; }
 .room-team form { grid-template-columns: 1fr; padding: 12px; margin-bottom: 12px; }
 .room-team .invite-once { font-size: 13px; margin-bottom: 12px; }
 .room-team .invite-link { font-size: 12px; word-break: break-all; }
+.files-upload { grid-template-columns: 1fr; padding: 12px; margin-bottom: 16px; }
+.files-list { list-style: none; padding: 0; margin: 0 0 14px; }
+.files-list li { display: flex; gap: 12px; align-items: center; font-size: 14px; padding: 10px 0; border-bottom: 1px solid #e2e6eb; }
+.files-list li .muted { margin-left: auto; }
+.file-card { border-left: 3px solid #253c55; padding-left: 14px; }
+.file-card p { margin: 0 0 6px; }
 @media (max-width: 600px) { .shell { grid-template-columns: minmax(0, 1fr); } .projects { display: none; } main { padding: 16px; } }
 @media (max-width: 950px) { .shell { grid-template-columns: 130px minmax(0, 1fr); } .context { display: none; } main { padding: 20px; } }

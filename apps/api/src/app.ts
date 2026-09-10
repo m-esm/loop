@@ -15,14 +15,17 @@ import { AuthController } from './auth.controller';
 import { HealthController } from './health.controller';
 import { RoomAgentStore } from './room-agents';
 import { RoomsController } from './rooms.controller';
+import { FileStore } from './files';
+import { FilesController } from './files.controller';
 
 @Module({
   providers: [
-    Database, EventBus, TaskStore, MessageStore, TaskRunner, AuthService, RoomAgentStore,
+    Database, EventBus, TaskStore, MessageStore, TaskRunner, AuthService, RoomAgentStore, FileStore,
     { provide: APP_GUARD, useClass: AuthGuard },
   ],
   controllers: [
     TasksController, StreamController, MessagesController, AuthController, HealthController, RoomsController,
+    FilesController,
   ],
 })
 class AppModule {}
