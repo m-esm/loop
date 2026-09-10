@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react';
 import type { MessageSnapshot, TaskSnapshot } from '@loop/types';
 import { api } from '../lib/api';
-import { applyTaskEvent, type RoomFeed } from '../lib/feed';
+import { applyTaskEvent, needsHumanCount, type RoomFeed } from '../lib/feed';
 import TasksFeed from './TasksFeed';
 import TasksPanel from './TasksPanel';
 import Transcript from './Transcript';
 import Composer from './Composer';
+import ProjectsRailEntry from './ProjectsRailEntry';
 
 export default function Room() {
   const [state, setState] = useState<RoomFeed>({ tasks: [], messages: [] });
@@ -29,6 +30,8 @@ export default function Room() {
     return () => controller.abort();
   }, [attempt]);
   return <>
+    {/* Room owns the feed; portal the rail entry so page.tsx stays a server shell. */}
+    <ProjectsRailEntry count={needsHumanCount(state.tasks)} />
     <nav aria-label="Room views">
       <button aria-pressed={view === 'chat'} onClick={() => setView('chat')}>Chat</button>
       <button aria-pressed={view === 'tasks'} onClick={() => setView('tasks')}>Tasks</button>
