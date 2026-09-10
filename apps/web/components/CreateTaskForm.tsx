@@ -25,7 +25,6 @@ export default function CreateTaskForm() {
   return <>
     <form onSubmit={submit} aria-label="Create task">
       <label>Title<input name="title" required maxLength={200} /></label>
-      <label>Owner<input name="owner" required maxLength={100} /></label>
       <label className="wide">Definition of done<textarea name="definitionOfDone" required maxLength={8000} rows={2} /></label>
       <button type="submit" disabled={pending}>{pending ? 'Creating...' : 'Create task'}</button>
     </form>

@@ -266,6 +266,8 @@ function generate(): string {
     'Migration `0005_task_verdict.sql` adds nullable `verdict`, `verdict_note`, and `verdict_by`.',
     'Migration `0006_task_proposal.sql` adds nullable `proposal`, `proposal_choice`, and `proposal_by`.',
     'Migration `0007_task_parent.sql` adds nullable `parent_task_id` referencing `tasks(id)`.',
+    'Migration `0008_auth.sql` adds `principals`, `credentials`, `sessions`, and `room_members`, plus nullable `*_principal_id` columns next to the legacy attribution strings.',
+    'A global guard requires a live `loop_session` cookie except on register, login, and health. Attribution is stamped from the session, not the request body. Agents get principals at boot and never get a session.',
     '',
   ];
 

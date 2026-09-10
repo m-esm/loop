@@ -11,10 +11,10 @@ function taskOf(over: Partial<Task> = {}): Task {
   return {
     id: 'task', roomId: 'default', title: 'Build', owner: 'Human', definitionOfDone: 'Proof',
     status: INITIAL_STATUS, createdAt: '', updatedAt: '',
-    agentId: null, claimedBy: null, runId: null, log: [], result: null, error: null,
-    question: null, answer: null, answeredBy: null,
-    verdict: null, verdictNote: null, verdictBy: null,
-    proposal: null, proposalChoice: null, proposalBy: null, parentTaskId: null, ...over,
+    ownerPrincipalId: 'human-1', agentId: null, claimedBy: null, runId: null, log: [], result: null, error: null,
+    question: null, answer: null, answeredBy: null, answeredByPrincipalId: null,
+    verdict: null, verdictNote: null, verdictBy: null, verdictByPrincipalId: null,
+    proposal: null, proposalChoice: null, proposalBy: null, proposalByPrincipalId: null, parentTaskId: null, ...over,
   };
 }
 
@@ -22,7 +22,7 @@ test('mixed replay keeps messages unique and a task card renders the updated tas
   const task: Task = taskOf();
   const created: TaskEvent = { id: 1, room_id: 'default', subject_id: task.id, ts: '', kind: 'task_created', payload: { task } };
   const card: TaskEvent = { id: 2, room_id: 'default', subject_id: 'card', ts: '', kind: 'message_created', payload: {
-    message: { id: 'card', roomId: 'default', author: 'Human', body: { kind: 'task', taskId: task.id }, createdAt: '' },
+    message: { id: 'card', roomId: 'default', author: 'Human', authorPrincipalId: 'human-1', body: { kind: 'task', taskId: task.id }, createdAt: '' },
   } };
   const text: TaskEvent = { ...card, id: 3, subject_id: 'text', payload: { message: { ...card.payload.message, id: 'text', body: { kind: 'text', text: 'Hello' } } } };
   const before = [created, card, text, card].reduce(applyTaskEvent, { tasks: [], messages: [] });
@@ -32,29 +32,29 @@ test('mixed replay keeps messages unique and a task card renders the updated tas
   assert.equal(after.messages.length, 2);
   assert.equal(before.tasks[0].status, INITIAL_STATUS);
   assert.equal(after.messages, before.messages);
-  const html = renderToStaticMarkup(createElement(MessageCard, { message: after.messages[0], task: after.tasks[0], author: 'Human' }));
+  const html = renderToStaticMarkup(createElement(MessageCard, { message: after.messages[0], task: after.tasks[0] }));
   assert.ok(html.includes(TASK_STATUSES.at(-1)!));
   assert.ok(html.includes('Build'));
   const withAgent = renderToStaticMarkup(createElement(TaskCard, {
-    task: taskOf({ agentId: 'reviewer' }), author: 'Human',
+    task: taskOf({ agentId: 'reviewer' }),
   }));
   assert.ok(withAgent.includes('Agent: reviewer'));
-  const withoutAgent = renderToStaticMarkup(createElement(TaskCard, { task: taskOf(), author: 'Human' }));
+  const withoutAgent = renderToStaticMarkup(createElement(TaskCard, { task: taskOf() }));
   assert.equal(withoutAgent.includes('Agent:'), false);
   const finished = renderToStaticMarkup(createElement(TaskCard, {
-    task: taskOf({ status: 'done', result: 'ok', log: ['one', 'two'] }), author: 'Moshe',
+    task: taskOf({ status: 'done', result: 'ok', log: ['one', 'two'] }),
   }));
   assert.ok(finished.includes('Accept'));
   assert.ok(finished.includes('Reject'));
   assert.ok(finished.includes('What happened · 2 lines'));
   assert.equal(finished.includes('data-task-verdict'), false);
   const accepted = renderToStaticMarkup(createElement(TaskCard, {
-    task: taskOf({ status: 'done', result: 'ok', verdict: 'accepted', verdictBy: 'Moshe' }), author: 'Moshe',
+    task: taskOf({ status: 'done', result: 'ok', verdict: 'accepted', verdictBy: 'Moshe', verdictByPrincipalId: 'human-1' }),
   }));
   assert.ok(accepted.includes('Accepted by Moshe'));
   assert.equal(accepted.includes('name="accepted"'), false);
   const running = renderToStaticMarkup(createElement(TaskCard, {
-    task: taskOf({ status: 'running', log: ['working'] }), author: 'Moshe',
+    task: taskOf({ status: 'running', log: ['working'] }),
   }));
   assert.ok(running.includes('Work in progress · 1 line'));
   assert.equal(running.includes('Accept'), false);
@@ -62,7 +62,7 @@ test('mixed replay keeps messages unique and a task card renders the updated tas
     question: 'Which store?', options: ['SQLite', 'Postgres'], pick: 'SQLite', why: 'one file, no service',
   };
   const proposing = renderToStaticMarkup(createElement(TaskCard, {
-    task: taskOf({ status: 'needs_input', proposal }), author: 'Moshe',
+    task: taskOf({ status: 'needs_input', proposal }),
   }));
   assert.ok(proposing.includes('data-task-proposal'));
   assert.ok(proposing.includes('data-proposal-option="SQLite"'));
@@ -71,7 +71,7 @@ test('mixed replay keeps messages unique and a task card renders the updated tas
   assert.ok(proposing.includes('Approve'));
   assert.ok(proposing.includes('Discuss'));
   const decided = renderToStaticMarkup(createElement(TaskCard, {
-    task: taskOf({ proposal, proposalChoice: 'Postgres', proposalBy: 'Moshe' }), author: 'Moshe',
+    task: taskOf({ proposal, proposalChoice: 'Postgres', proposalBy: 'Moshe', proposalByPrincipalId: 'human-1' }),
   }));
   assert.ok(decided.includes('data-task-choice'));
   assert.ok(decided.includes('Postgres by Moshe'));
@@ -79,16 +79,16 @@ test('mixed replay keeps messages unique and a task card renders the updated tas
   const parent = taskOf({ id: 'parent', title: 'Break this down' });
   const child = taskOf({ id: 'child', title: 'Review the split', parentTaskId: parent.id });
   const withParent = renderToStaticMarkup(createElement(TaskCard, {
-    task: child, author: 'Moshe', tasks: [parent, child],
+    task: child, tasks: [parent, child],
   }));
   assert.ok(withParent.includes('data-task-parent'));
   assert.ok(withParent.includes('From: Break this down'));
   const missingParent = renderToStaticMarkup(createElement(TaskCard, {
-    task: child, author: 'Moshe',
+    task: child,
   }));
   assert.ok(missingParent.includes('From: parent'));
   assert.equal(missingParent.includes('From: Break this down'), false);
-  const root = renderToStaticMarkup(createElement(TaskCard, { task: parent, author: 'Moshe' }));
+  const root = renderToStaticMarkup(createElement(TaskCard, { task: parent }));
   assert.equal(root.includes('data-task-parent'), false);
 });
 
@@ -113,9 +113,8 @@ test('task_progress upserts the live log without adding a row', () => {
   assert.deepEqual(after.tasks[0].log, ['Echo started']);
   assert.equal(after.tasks[0].status, 'running');
   const html = renderToStaticMarkup(createElement(MessageCard, {
-    message: { id: 'card', roomId: 'default', author: 'Human', body: { kind: 'task', taskId: task.id }, createdAt: '' },
+    message: { id: 'card', roomId: 'default', author: 'Human', authorPrincipalId: 'human-1', body: { kind: 'task', taskId: task.id }, createdAt: '' },
     task: { ...after.tasks[0], status: 'done', result: 'Echo: Build', log: ['Echo started', 'Echo finished'] },
-    author: 'Human',
   }));
   assert.ok(html.includes('Echo started'));
   assert.ok(html.includes('Echo: Build'));

@@ -132,5 +132,8 @@ th, td { padding: 14px 8px; border-bottom: 1px solid #e2e6eb; vertical-align: to
 .composer .wide { grid-column: 1 / -1; margin: 0; }
 nav button[aria-pressed="true"] { background: #253c55; color: #fff; }
 nav [data-live] { margin-left: auto; align-self: center; }
+nav .logout { margin-left: 12px; }
+.auth-panel { max-width: 420px; }
+.auth-panel form { grid-template-columns: 1fr; }
 @media (max-width: 600px) { .shell { grid-template-columns: minmax(0, 1fr); } .projects { display: none; } main { padding: 16px; } }
 @media (max-width: 950px) { .shell { grid-template-columns: 130px minmax(0, 1fr); } .context { display: none; } main { padding: 20px; } }

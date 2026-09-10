@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import type { Request, Response } from 'express';
 import { StreamController } from '../src/stream.controller';
+import type { AuthService } from '../src/auth';
 import type { EventBus } from '../src/bus';
 
 test('SSE sends a comment at 25 seconds and cleans up on disconnect', (context) => {
@@ -14,11 +15,21 @@ test('SSE sends a comment at 25 seconds and cleans up on disconnect', (context) 
   response.set = () => response;
   response.flushHeaders = () => {};
   response.write = (chunk: string) => { frames.push(chunk); return true; };
+  response.end = () => {};
+  response.destroyed = false;
   const bus = {
     since: () => [],
     subscribe: () => () => { unsubscribed = true; },
   } as unknown as EventBus;
-  new StreamController(bus).stream('0', { headers: {} } as Request, response as unknown as Response);
+  const auth = {
+    roomIds: () => ['default'],
+    isSessionLive: () => true,
+  } as unknown as AuthService;
+  new StreamController(bus, auth).stream('0', {
+    headers: {},
+    principal: { id: 'p', kind: 'human', displayName: 'Moshe', email: null },
+    sessionTokenHash: 'hash',
+  } as unknown as Request, response as unknown as Response);
   context.mock.timers.tick(24_999);
   assert.deepEqual(frames, []);
   context.mock.timers.tick(1);

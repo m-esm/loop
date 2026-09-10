@@ -33,7 +33,7 @@ export class MessageStore {
     // can never see the referencing message before its durable task event.
     const body: MessageBody = parsed.kind === 'text' ? parsed : {
       kind: 'task', taskId: this.tasks.create({
-        roomId: input.roomId, owner: input.author,
+        roomId: input.roomId, owner: input.author, ownerPrincipalId: input.authorPrincipalId ?? null,
         title: parsed.title, definitionOfDone: parsed.definitionOfDone,
         ...(parsed.agentId ? { agentId: parsed.agentId } : {}),
       }).id,
@@ -41,7 +41,8 @@ export class MessageStore {
     const event = this.bus.emitEvent(() => {
       const ts = new Date().toISOString();
       const message = this.database.db.insert(messages).values({
-        id: randomUUID(), roomId: input.roomId, author: input.author, body, createdAt: ts,
+        id: randomUUID(), roomId: input.roomId, author: input.author,
+        authorPrincipalId: input.authorPrincipalId ?? null, body, createdAt: ts,
       }).returning().get();
       return { subject_id: message.id, room_id: message.roomId, ts, kind: 'message_created', payload: { message } };
     });
@@ -50,13 +51,14 @@ export class MessageStore {
   }
 
   /** Card for an already-created task, so a spawned child shows in the transcript. */
-  attachTask(room: string, author: string, taskId: string) {
+  attachTask(room: string, author: string, taskId: string, authorPrincipalId?: string | null) {
     roomId(room);
     this.tasks.get(taskId);
     const event = this.bus.emitEvent(() => {
       const ts = new Date().toISOString();
       const message = this.database.db.insert(messages).values({
-        id: randomUUID(), roomId: room, author, body: { kind: 'task', taskId }, createdAt: ts,
+        id: randomUUID(), roomId: room, author, authorPrincipalId: authorPrincipalId ?? null,
+        body: { kind: 'task', taskId }, createdAt: ts,
       }).returning().get();
       return { subject_id: message.id, room_id: message.roomId, ts, kind: 'message_created', payload: { message } };
     });

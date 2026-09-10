@@ -4,12 +4,17 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { once } from 'node:events';
+import { authedContext, seedSession, withAuth } from './auth';
 
 // The fast one. Every other spec proves one feature in depth; this proves the
 // product still does its two basic things, so it is cheap enough to run after
 // every change rather than only before a PR.
-test('smoke: a chat message appears and a short task finishes', async ({ browser, request }) => {
+test('smoke: a chat message appears and a short task finishes', async ({ browser, request: raw }) => {
   const dir = mkdtempSync(join(tmpdir(), 'loop-smoke-'));
+  // Auth: the API rejects anonymous calls, so seed a session and use it for
+  // both the readiness poll and the browser, the same way every other spec does.
+  const session = seedSession(join(dir, 'loop.sqlite'));
+  const request = withAuth(raw, session.token);
   writeFileSync(join(dir, 'agents.json'), JSON.stringify({
     agents: [
       {
@@ -49,7 +54,7 @@ test('smoke: a chat message appears and a short task finishes', async ({ browser
         .catch(() => 0);
     }).toBe(200);
 
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const context = await authedContext(browser, session.token);
     const page = await context.newPage();
     await page.goto('http://127.0.0.1:3100');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');

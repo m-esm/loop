@@ -6,9 +6,16 @@ export * from './proposal';
 export * from './spawn';
 
 export type MessageBody = { kind: 'text'; text: string } | { kind: 'task'; taskId: string };
-export interface Message { id: string; roomId: string; author: string; body: MessageBody; createdAt: string }
+export interface Message {
+  id: string;
+  roomId: string;
+  author: string;
+  authorPrincipalId: string | null;
+  body: MessageBody;
+  createdAt: string;
+}
 export interface MessageSnapshot { messages: Message[]; since: number }
-export interface CreateMessage { roomId: string; author: string; body: string }
+export interface CreateMessage { roomId: string; author: string; body: string; authorPrincipalId?: string | null }
 
 export type TaskVerdict = 'accepted' | 'rejected';
 export function isTaskVerdict(value: unknown): value is TaskVerdict {
@@ -19,6 +26,7 @@ export interface CreateTask {
   roomId?: string;
   title: string;
   owner: string;
+  ownerPrincipalId?: string | null;
   definitionOfDone: string;
   agentId?: string | null;
   parentTaskId?: string | null;
@@ -29,6 +37,7 @@ export interface Task extends CreateTask {
   status: TaskStatus;
   createdAt: string;
   updatedAt: string;
+  ownerPrincipalId: string | null;
   agentId: string | null;
   claimedBy: string | null;
   runId: string | null;
@@ -38,12 +47,15 @@ export interface Task extends CreateTask {
   question: string | null;
   answer: string | null;
   answeredBy: string | null;
+  answeredByPrincipalId: string | null;
   verdict: TaskVerdict | null;
   verdictNote: string | null;
   verdictBy: string | null;
+  verdictByPrincipalId: string | null;
   proposal: TaskProposal | null;
   proposalChoice: string | null;
   proposalBy: string | null;
+  proposalByPrincipalId: string | null;
   parentTaskId: string | null;
 }
 export interface TaskEventPayloads {

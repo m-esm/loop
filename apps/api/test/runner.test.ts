@@ -461,6 +461,8 @@ test('LOOP_SPAWN creates children without parking the parent, then the children 
   assert.equal(children.length, 2);
   assert.deepEqual(children.map((row) => row.title).sort(), ['First child', 'Second child']);
   assert.ok(children.every((row) => row.roomId === parent.roomId));
+  assert.ok(children.every((row) => row.owner === 'Planner'));
+  assert.ok(children.every((row) => row.ownerPrincipalId === 'planner'));
   await waitFor(() => children.every((row) => store.get(row.id).status === 'done'));
   assert.ok(children.every((row) => store.get(row.id).result === 'child-done'));
   const cards = messages.list(parent.roomId).messages.filter((message) => message.body.kind === 'task');

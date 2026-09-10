@@ -4,7 +4,7 @@ import { useRef, useState, type FormEvent } from 'react';
 import { parseComposer } from '@loop/types';
 import { api } from '../lib/api';
 
-export default function Composer({ author, onAuthorChange }: { author: string; onAuthorChange: (value: string) => void }) {
+export default function Composer({ author }: { author: string }) {
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
   const sending = useRef(false);
@@ -19,13 +19,13 @@ export default function Composer({ author, onAuthorChange }: { author: string; o
     setError('');
     try {
       await api('/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomId: 'default', author, body }) });
+        body: JSON.stringify({ roomId: 'default', body }) });
       setBody('');
     } catch (error) { setError(error instanceof Error ? error.message : 'Message could not be sent.'); }
     finally { sending.current = false; setBusy(false); }
   }
   return <form className="composer" onSubmit={send}>
-    <label>Author<input value={author} onChange={(event) => onAuthorChange(event.target.value)} maxLength={100} required disabled={busy} /></label>
+    <p className="muted wide">Signed in as {author}</p>
     <label className="wide" htmlFor="room-message">Message</label>
     <textarea className="wide" id="room-message" value={body} onChange={(event) => setBody(event.target.value)} rows={3} maxLength={8000} disabled={busy}
       onKeyDown={(event) => {

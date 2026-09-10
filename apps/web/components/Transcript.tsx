@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 import { isActiveStatus, type Message, type Task } from '@loop/types';
 import MessageCard from './MessageCard';
 
-export default function Transcript({ messages, tasks, author }: { messages: Message[]; tasks: Task[]; author: string }) {
+export default function Transcript({ messages, tasks }: { messages: Message[]; tasks: Task[] }) {
   const container = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
   const pinned = useRef(new Set<string>());
@@ -44,7 +44,7 @@ export default function Transcript({ messages, tasks, author }: { messages: Mess
       follow.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
     }}>
     {!messages.length && <p className="muted">Start the conversation, or use /task to create a task here.</p>}
-    {messages.map((message) => <MessageCard key={message.id} message={message} author={author} tasks={tasks}
+    {messages.map((message) => <MessageCard key={message.id} message={message} tasks={tasks}
       task={message.body.kind === 'task' ? byId.get(message.body.taskId) : undefined} />)}
   </div>;
 }

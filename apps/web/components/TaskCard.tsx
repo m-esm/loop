@@ -2,9 +2,9 @@
 
 import { useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { chipClass, isActiveStatus, isRunningStatus, type Task } from '@loop/types';
-import { api } from '../lib/api';
+import { actorLabel, api } from '../lib/api';
 
-export default function TaskCard({ task, author, tasks = [] }: { task: Task; author: string; tasks?: Task[] }) {
+export default function TaskCard({ task, tasks = [] }: { task: Task; tasks?: Task[] }) {
   const terminal = !isActiveStatus(task.status);
   const proposing = task.status === 'needs_input' && !!task.proposal && !task.proposalChoice;
   const waiting = task.status === 'needs_input' && !!task.question && !proposing;
@@ -22,7 +22,7 @@ export default function TaskCard({ task, author, tasks = [] }: { task: Task; aut
     try {
       await api(`/tasks/${task.id}/answer`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answer, answeredBy: author }),
+        body: JSON.stringify({ answer }),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Answer could not be sent.');
@@ -40,7 +40,7 @@ export default function TaskCard({ task, author, tasks = [] }: { task: Task; aut
       await api(`/tasks/${task.id}/review`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          verdict, reviewedBy: author, ...(trimmed ? { note: trimmed } : {}),
+          verdict, ...(trimmed ? { note: trimmed } : {}),
         }),
       });
       // A submitted note belongs to that verdict. Leaving it in the box means a
@@ -63,7 +63,7 @@ export default function TaskCard({ task, author, tasks = [] }: { task: Task; aut
     try {
       await api(`/tasks/${task.id}/decide`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ choice: decided, decidedBy: author }),
+        body: JSON.stringify({ choice: decided }),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Decision could not be sent.');
@@ -87,7 +87,7 @@ export default function TaskCard({ task, author, tasks = [] }: { task: Task; aut
   return <div className={waiting || proposing ? 'chat-task question-card' : 'chat-task'} data-task-id={task.id}>
     <h3>{task.title}</h3><span className={chipClass(task.status)}>{task.status}</span>
     {parentTitle && <p data-task-parent className="task-parent">From: {parentTitle}</p>}
-    <p>Owner: {task.owner}</p>
+    <p>Owner: {actorLabel(task.owner, task.ownerPrincipalId)}</p>
     {task.agentId && <p data-task-agent>Agent: {task.agentId}</p>}
     <p className="done-when" title={task.definitionOfDone}>Done when: {task.definitionOfDone}</p>
     {task.question && <p data-task-question className="task-question">{task.question}</p>}
@@ -111,7 +111,7 @@ export default function TaskCard({ task, author, tasks = [] }: { task: Task; aut
       </form>}
     </div>}
     {task.proposalChoice && <p data-task-choice className="task-choice">
-      {task.proposalChoice === 'discuss' ? 'Discuss' : task.proposalChoice === 'reject' ? 'Reject' : task.proposalChoice} by {task.proposalBy ?? 'unknown'}
+      {task.proposalChoice === 'discuss' ? 'Discuss' : task.proposalChoice === 'reject' ? 'Reject' : task.proposalChoice} by {actorLabel(task.proposalBy, task.proposalByPrincipalId)}
     </p>}
     {waiting && <form className="answer-form" onSubmit={submit}>
       <label>Answer<textarea value={answer} onChange={(event) => setAnswer(event.target.value)}
@@ -120,7 +120,7 @@ export default function TaskCard({ task, author, tasks = [] }: { task: Task; aut
       <button type="submit" disabled={busy}>{busy ? 'Sending...' : 'Submit answer'}</button>
     </form>}
     {task.answer && <p data-task-answer className="task-answer">
-      Answered by {task.answeredBy ?? 'unknown'}: {task.answer}
+      Answered by {actorLabel(task.answeredBy, task.answeredByPrincipalId)}: {task.answer}
     </p>}
     {showLog && <details onToggle={(event) => {
       if (!event.currentTarget.open) return;
@@ -138,7 +138,7 @@ export default function TaskCard({ task, author, tasks = [] }: { task: Task; aut
     {terminal && task.result && <p data-task-result className="task-result">{task.result}</p>}
     {terminal && task.error && <p data-task-error className="task-error">{task.error}</p>}
     {task.verdict && <p data-task-verdict className="task-verdict">
-      {task.verdict === 'accepted' ? 'Accepted' : 'Rejected'} by {task.verdictBy ?? 'unknown'}
+      {task.verdict === 'accepted' ? 'Accepted' : 'Rejected'} by {actorLabel(task.verdictBy, task.verdictByPrincipalId)}
       {task.verdictNote ? `: ${task.verdictNote}` : ''}
     </p>}
     {terminal && !task.verdict && <form className="answer-form" onSubmit={submitReview}>

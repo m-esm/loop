@@ -2,19 +2,21 @@ import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { INestApplication } from '@nestjs/common';
 import type { Message, MessageSnapshot, Task, TaskEvent } from '@loop/types';
-import { createApp } from '../src/app';
 import { EventBus } from '../src/bus';
+import { jsonHeaders, startAuthedApp } from './helpers';
 
 let app: INestApplication;
 let url: string;
+let cookie: string;
 const previous = process.env.LOOP_RUNNER;
 
 before(async () => {
   process.env.DATABASE_PATH = ':memory:';
   process.env.LOOP_RUNNER = '1';
-  app = await createApp(false);
-  await app.listen(0, '127.0.0.1');
-  url = `${await app.getUrl()}/api`;
+  const started = await startAuthedApp();
+  app = started.app;
+  url = started.url;
+  cookie = started.cookie;
 });
 after(async () => {
   if (previous === undefined) delete process.env.LOOP_RUNNER;
@@ -24,8 +26,8 @@ after(async () => {
 
 async function postTask(body: string) {
   const response = await fetch(`${url}/messages`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ roomId: 'default', author: 'Human', body }),
+    method: 'POST', headers: jsonHeaders(cookie),
+    body: JSON.stringify({ roomId: 'default', body }),
   });
   assert.equal(response.status, 201);
   const message = await response.json() as Message;
@@ -38,7 +40,7 @@ async function waitTask(id: string, status: Task['status'], ms = 5000) {
   const start = Date.now();
   let task: Task | undefined;
   while (Date.now() - start < ms) {
-    const response = await fetch(`${url}/tasks/${id}`);
+    const response = await fetch(`${url}/tasks/${id}`, { headers: { Cookie: cookie } });
     assert.equal(response.status, 200);
     task = await response.json() as Task;
     if (task.status === status) return task;
@@ -58,7 +60,7 @@ test('LOOP_RUNNER finishes /task without PATCH and fails FAIL: titles', async ()
   const failId = await postTask('/task FAIL: boom :: x');
   const failed = await waitTask(failId, 'failed');
   assert.equal(failed.error, 'boom');
-  const snapshot = await (await fetch(`${url}/messages?roomId=default`)).json() as MessageSnapshot;
+  const snapshot = await (await fetch(`${url}/messages?roomId=default`, { headers: { Cookie: cookie } })).json() as MessageSnapshot;
   assert.equal(snapshot.messages.length, 2);
   const replay = app.get(EventBus).since(0) as TaskEvent[];
   let folded: Task | undefined;
@@ -99,8 +101,8 @@ test('ASK: title parks, POST answer resumes, and the result carries the answer',
   const parked = await waitTask(askId, 'needs_input');
   assert.equal(parked.question, 'what colour');
   const response = await fetch(`${url}/tasks/${askId}/answer`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ answer: 'blue', answeredBy: 'Moshe' }),
+    method: 'POST', headers: jsonHeaders(cookie),
+    body: JSON.stringify({ answer: 'blue' }),
   });
   assert.equal(response.status, 200);
   const done = await waitTask(askId, 'done');

@@ -2,12 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { TaskEvent } from '@loop/types';
-import { API_URL } from '../lib/api';
+import { API_URL, api, ApiError, type Me } from '../lib/api';
 import { sseBackoffDelay } from '../lib/feed';
 
 /** Port of the silent 3DVP TasksFeed: one connection mounted per room. */
-export default function TasksFeed({ since, onEvent }: {
-  since: number; onEvent: (event: TaskEvent) => void;
+export default function TasksFeed({ since, onEvent, onUnauthorized }: {
+  since: number; onEvent: (event: TaskEvent) => void; onUnauthorized?: () => void;
 }) {
   const [live, setLive] = useState(false);
   const onEventRef = useRef(onEvent);
@@ -39,14 +39,21 @@ export default function TasksFeed({ since, onEvent }: {
       if (closed || es) return;
       // Also defer if visibility changed after a retry timer was scheduled.
       if (document.hidden) { waitingVisible = true; return; }
-      const source = new EventSource(`${API_URL}/stream?since=${lastId}`);
+      const source = new EventSource(`${API_URL}/stream?since=${lastId}`, { withCredentials: true });
       es = source;
       source.onopen = () => { attempt = 0; setLive(true); };
       source.onerror = () => {
         setLive(false);
         source.close();
         es = null;
-        scheduleReconnect();
+        void api<Me>('/auth/me').then(() => scheduleReconnect()).catch((error) => {
+          if (error instanceof ApiError && error.status === 401) {
+            closed = true;
+            onUnauthorized?.();
+            return;
+          }
+          scheduleReconnect();
+        });
       };
       source.onmessage = (message) => {
         try {

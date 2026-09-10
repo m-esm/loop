@@ -5,9 +5,12 @@ import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { once } from 'node:events';
 import type { Task } from '@loop/types';
+import { authedContext, seedSession, withAuth } from './auth';
 
-test('Chat and Tasks tabs show needs-human and active counts, and hide at zero', async ({ browser, request }) => {
+test('Chat and Tasks tabs show needs-human and active counts, and hide at zero', async ({ browser, request: raw }) => {
   const dir = mkdtempSync(join(tmpdir(), 'loop-tab-badges-'));
+  const session = seedSession(join(dir, 'loop.sqlite'));
+  const request = withAuth(raw, session.token);
   let api: ChildProcess | undefined;
   let output = '';
   const contexts: BrowserContext[] = [];
@@ -37,14 +40,14 @@ test('Chat and Tasks tabs show needs-human and active counts, and hide at zero',
   }
   async function createTask(title: string) {
     const response = await request.post(`${apiUrl}/tasks`, {
-      data: { title, owner: 'Moshe', definitionOfDone: 'proof' },
+      data: { title, definitionOfDone: 'proof' },
     });
     expect(response.status()).toBe(201);
     return response.json() as Promise<Task>;
   }
   try {
     await startApi();
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const context = await authedContext(browser, session.token);
     contexts.push(context);
     const page = await context.newPage();
     await page.goto('http://127.0.0.1:3100');
