@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setImmediate as defer } from 'node:timers';
@@ -272,4 +272,31 @@ test('LOOP_ASK line parks, then reruns with LOOP_TASK_ANSWER', async () => {
   store.answer(task.id, 'green', 'Moshe');
   await waitFor(() => store.get(task.id).status === 'done');
   assert.equal(store.get(task.id).result, 'got green');
+});
+
+test('the child gets an allowlisted env and a cwd outside the API, not the server process env', async () => {
+  process.env.LOOP_TEST_SECRET = 'hunter2';
+  try {
+    rebuildRunner([{
+      id: 'probe', name: 'Probe',
+      // Print the raw cwd. Comparing it to an env var inside the child is
+      // vacuous: that name is not on the allowlist, so it is always undefined
+      // and the comparison would pass even if spawn used the API directory.
+      command: nodeCommand(
+        "process.stdout.write('secret='+(process.env.LOOP_TEST_SECRET||'absent')+' cwd='+process.cwd()+'\\n')",
+      ),
+    }]);
+    const task = store.create(input);
+    runner.start();
+    await waitFor(() => store.get(task.id).status === 'done');
+    const result = store.get(task.id).result ?? '';
+    // An agent command is arbitrary code from a config file. It must not be able
+    // to read the API's secrets or write relative paths into the API's cwd.
+    assert.match(result, /^secret=absent cwd=/);
+    const childCwd = realpathSync(result.slice(result.indexOf(' cwd=') + 5));
+    assert.notEqual(childCwd, realpathSync(process.cwd()));
+    assert.equal(childCwd, realpathSync(tmpdir()));
+  } finally {
+    delete process.env.LOOP_TEST_SECRET;
+  }
 });

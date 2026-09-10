@@ -6,6 +6,8 @@ export type AgentConfig = {
   id: string;
   name: string;
   command: string[];
+  /** Where the command runs. Defaults to a temp dir, never the API's cwd. */
+  cwd?: string;
 };
 
 const logger = new Logger('Agents');
@@ -65,11 +67,14 @@ export function loadAgents(path = agentsPath()): AgentConfig[] {
     if (!Array.isArray(row.command) || row.command.length === 0 || row.command.some((part) => typeof part !== 'string')) {
       throw new Error(`Malformed agents file at ${path}: agents[${index}].command must be a nonempty array of strings`);
     }
+    if (row.cwd !== undefined && (typeof row.cwd !== 'string' || row.cwd.length === 0)) {
+      throw new Error(`Malformed agents file at ${path}: agents[${index}].cwd must be a nonempty string`);
+    }
     if (ids.has(row.id)) {
       throw new Error(`Malformed agents file at ${path}: duplicate agent id ${row.id}`);
     }
     ids.add(row.id);
-    agents.push({ id: row.id, name: row.name, command: row.command as string[] });
+    agents.push({ id: row.id, name: row.name, command: row.command as string[], ...(row.cwd ? { cwd: row.cwd as string } : {}) });
   }
   return agents;
 }
