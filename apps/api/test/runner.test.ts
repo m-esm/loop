@@ -273,3 +273,25 @@ test('LOOP_ASK line parks, then reruns with LOOP_TASK_ANSWER', async () => {
   await waitFor(() => store.get(task.id).status === 'done');
   assert.equal(store.get(task.id).result, 'got green');
 });
+
+test('the child gets an allowlisted env and a cwd outside the API, not the server process env', async () => {
+  process.env.LOOP_TEST_SECRET = 'hunter2';
+  try {
+    rebuildRunner([{
+      id: 'probe', name: 'Probe',
+      command: nodeCommand(
+        "process.stdout.write('secret='+(process.env.LOOP_TEST_SECRET||'absent')+' cwd='+(process.cwd()===process.env.LOOP_EXPECT_CWD?'api':'elsewhere')+'\\n')",
+      ),
+    }]);
+    process.env.LOOP_EXPECT_CWD = process.cwd();
+    const task = store.create(input);
+    runner.start();
+    await waitFor(() => store.get(task.id).status === 'done');
+    // An agent command is arbitrary code from a config file. It must not be able
+    // to read the API's secrets or write relative paths into the API's cwd.
+    assert.equal(store.get(task.id).result, 'secret=absent cwd=elsewhere');
+  } finally {
+    delete process.env.LOOP_TEST_SECRET;
+    delete process.env.LOOP_EXPECT_CWD;
+  }
+});

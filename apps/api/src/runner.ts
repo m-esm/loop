@@ -1,6 +1,7 @@
 import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
+import { tmpdir } from 'node:os';
 import { setImmediate as defer, setInterval, setTimeout, clearInterval, clearTimeout } from 'node:timers';
 import type { Readable } from 'node:stream';
 import { INITIAL_STATUS, type Task } from '@loop/types';
@@ -152,16 +153,25 @@ export class TaskRunner implements OnModuleInit, OnModuleDestroy {
     };
     const onStderr = (line: string) => push(line, 'stderr');
     try {
-      const env = { ...process.env };
-      env.LOOP_TASK_TITLE = task.title;
-      env.LOOP_TASK_ID = task.id;
-      env.LOOP_TASK_DONE_WHEN = task.definitionOfDone;
+      // Allowlist, not `{ ...process.env }`. An agent command is arbitrary code
+      // from a config file; inheriting the API's environment would hand it every
+      // secret the server holds. PATH and HOME are what a command needs to run.
+      const env: NodeJS.ProcessEnv = {
+        PATH: process.env.PATH,
+        HOME: process.env.HOME,
+        LANG: process.env.LANG,
+        TZ: process.env.TZ,
+        LOOP_TASK_TITLE: task.title,
+        LOOP_TASK_ID: task.id,
+        LOOP_TASK_DONE_WHEN: task.definitionOfDone,
+      };
       if (task.answer) env.LOOP_TASK_ANSWER = task.answer;
-      else delete env.LOOP_TASK_ANSWER;
 
       child = spawn(agent.command[0], agent.command.slice(1), {
         shell: false,
         env,
+        // Explicit, so a child cannot write relative paths into the API's cwd.
+        cwd: agent.cwd ?? tmpdir(),
         stdio: ['ignore', 'pipe', 'pipe'],
       });
       const closed = once(child, 'close') as Promise<[number | null, NodeJS.Signals | null]>;
