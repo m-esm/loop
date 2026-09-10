@@ -202,12 +202,12 @@ test('Files view shows an uploaded file and a member sees the file card', async 
       mimeType: 'text/plain',
       buffer: Buffer.from('from the ui\n'),
     });
-    await form.getByRole('button', { name: 'Upload' }).click();
+    await form.getByRole('button', { name: 'Upload', exact: true }).click();
     const row = page.locator('[data-file-row]');
     await expect(row).toBeVisible();
     await expect(row.getByText('brief.txt')).toBeVisible();
     await expect(form.getByLabel('Upload file')).toBeInViewport({ ratio: 1 });
-    await expect(form.getByRole('button', { name: 'Upload' })).toBeInViewport({ ratio: 1 });
+    await expect(form.getByRole('button', { name: 'Upload', exact: true })).toBeInViewport({ ratio: 1 });
     await expect(row).toBeInViewport({ ratio: 1 });
     await page.screenshot({ path: resolve('docs/screenshots/files.png') });
 
