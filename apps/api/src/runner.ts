@@ -10,6 +10,7 @@ import { listRoomAgents, syncCatalogRoomAgents } from './room-agents';
 import { EventBus } from './bus';
 import { MessageStore } from './message-store';
 import { syncAgentPrincipals } from './principals';
+import { listTaskFiles } from './files';
 import { RunFenceError, TaskStore } from './task-store';
 
 const PROGRESS_MIN_INTERVAL_MS = 500;
@@ -250,6 +251,7 @@ export class TaskRunner implements OnModuleInit, OnModuleDestroy {
         LOOP_TASK_TITLE: task.title,
         LOOP_TASK_ID: task.id,
         LOOP_TASK_DONE_WHEN: task.definitionOfDone,
+        LOOP_TASK_FILES: JSON.stringify(listTaskFiles(this.store.database, task.roomId)),
       };
       if (task.answer) env.LOOP_TASK_ANSWER = task.answer;
       if (task.verdictNote) env.LOOP_TASK_NOTE = task.verdictNote;

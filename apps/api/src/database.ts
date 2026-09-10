@@ -13,6 +13,7 @@ export class Database implements OnModuleDestroy {
   constructor() {
     const path = process.env.DATABASE_PATH ?? resolve(process.cwd(), 'data/loop.sqlite');
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
+    mkdirSync(process.env.LOOP_FILES_PATH ?? resolve(process.cwd(), 'data/files'), { recursive: true });
     this.sqlite = new Sqlite(path);
     this.sqlite.pragma('journal_mode = WAL');
     this.sqlite.pragma('foreign_keys = ON');

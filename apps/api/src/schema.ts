@@ -99,3 +99,14 @@ export const messages = sqliteTable('messages', {
   body: text('body', { mode: 'json' }).$type<MessageBody>().notNull(),
   createdAt: text('created_at').notNull(),
 });
+export const files = sqliteTable('files', {
+  id: text('id').primaryKey(),
+  roomId: text('room_id').notNull().references(() => rooms.id),
+  name: text('name').notNull(),
+  size: integer('size').notNull(),
+  contentType: text('content_type').notNull(),
+  sha256: text('sha256').notNull(),
+  storedPath: text('stored_path').notNull(),
+  uploadedBy: text('uploaded_by').notNull(),
+  createdAt: text('created_at').notNull(),
+});

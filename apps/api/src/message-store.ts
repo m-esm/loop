@@ -53,6 +53,22 @@ export class MessageStore {
     return event.payload.message;
   }
 
+  /** Card for an uploaded file, so every member sees the same transcript row. */
+  attachFile(room: string, author: string, fileId: string, authorPrincipalId?: string | null) {
+    roomId(room);
+    assertKnownRoom(this.database, room);
+    const event = this.bus.emitEvent(() => {
+      const ts = new Date().toISOString();
+      const message = this.database.db.insert(messages).values({
+        id: randomUUID(), roomId: room, author, authorPrincipalId: authorPrincipalId ?? null,
+        body: { kind: 'file', fileId }, createdAt: ts,
+      }).returning().get();
+      return { subject_id: message.id, room_id: message.roomId, ts, kind: 'message_created', payload: { message } };
+    });
+    if (event.kind !== 'message_created') throw new Error('Unexpected event kind');
+    return event.payload.message;
+  }
+
   /** Card for an already-created task, so a spawned child shows in the transcript. */
   attachTask(room: string, author: string, taskId: string, authorPrincipalId?: string | null) {
     roomId(room);
