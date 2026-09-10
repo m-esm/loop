@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { INITIAL_STATUS, TASK_STATUSES, isRunningStatus, type CreateTask, type TaskSnapshot, type TaskStatus } from '@loop/types';
@@ -143,6 +143,44 @@ export class TaskStore {
       if (error instanceof RunFenceError) return null;
       throw error;
     }
+  }
+
+  ask(id: string, runId: string, question: string) {
+    const event = this.bus.emitEvent(() => {
+      const ts = new Date().toISOString();
+      const task = this.database.db.update(tasks).set({
+        status: 'needs_input', question, updatedAt: ts,
+      }).where(and(eq(tasks.id, id), eq(tasks.status, 'running'), eq(tasks.runId, runId))).returning().get();
+      if (!task) {
+        this.get(id);
+        throw new RunFenceError();
+      }
+      return {
+        subject_id: id, room_id: task.roomId, ts, kind: 'task_status_changed',
+        payload: { task, previousStatus: 'running' },
+      };
+    });
+    if (event.kind !== 'task_status_changed') throw new Error('Unexpected event kind');
+    return event.payload.task;
+  }
+
+  answer(id: string, answer: string, answeredBy: string) {
+    const event = this.bus.emitEvent(() => {
+      const ts = new Date().toISOString();
+      const task = this.database.db.update(tasks).set({
+        answer, answeredBy, status: INITIAL_STATUS, updatedAt: ts,
+      }).where(and(eq(tasks.id, id), eq(tasks.status, 'needs_input'))).returning().get();
+      if (!task) {
+        this.get(id);
+        throw new BadRequestException('Task is not waiting for an answer');
+      }
+      return {
+        subject_id: id, room_id: task.roomId, ts, kind: 'task_status_changed',
+        payload: { task, previousStatus: 'needs_input' },
+      };
+    });
+    if (event.kind !== 'task_status_changed') throw new Error('Unexpected event kind');
+    return event.payload.task;
   }
 
   reclaimLost() {

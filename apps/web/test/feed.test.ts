@@ -10,7 +10,8 @@ function taskOf(over: Partial<Task> = {}): Task {
   return {
     id: 'task', roomId: 'default', title: 'Build', owner: 'Human', definitionOfDone: 'Proof',
     status: INITIAL_STATUS, createdAt: '', updatedAt: '',
-    claimedBy: null, runId: null, log: [], result: null, error: null, ...over,
+    claimedBy: null, runId: null, log: [], result: null, error: null,
+    question: null, answer: null, answeredBy: null, ...over,
   };
 }
 

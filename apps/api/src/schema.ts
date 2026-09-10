@@ -17,6 +17,9 @@ export const tasks = sqliteTable('tasks', {
   log: text('log', { mode: 'json' }).$type<string[]>().notNull().$defaultFn(() => []),
   result: text('result'),
   error: text('error'),
+  question: text('question'),
+  answer: text('answer'),
+  answeredBy: text('answered_by'),
 });
 export const events = sqliteTable('events', {
   id: integer('id').primaryKey({ autoIncrement: true }),

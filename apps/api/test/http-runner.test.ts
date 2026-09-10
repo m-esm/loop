@@ -75,3 +75,18 @@ test('LOOP_RUNNER finishes /task without PATCH and fails FAIL: titles', async ()
   assert.deepEqual(folded?.log, echo.log);
   assert.equal(folded?.result, echo.result);
 });
+
+test('ASK: title parks, POST answer resumes, and the result carries the answer', async () => {
+  const askId = await postTask('/task ASK: what colour :: proof');
+  const parked = await waitTask(askId, 'needs_input');
+  assert.equal(parked.question, 'what colour');
+  const response = await fetch(`${url}/tasks/${askId}/answer`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ answer: 'blue', answeredBy: 'Moshe' }),
+  });
+  assert.equal(response.status, 200);
+  const done = await waitTask(askId, 'done');
+  assert.equal(done.result, 'Answered: blue');
+  assert.equal(done.answer, 'blue');
+  assert.equal(done.answeredBy, 'Moshe');
+});
