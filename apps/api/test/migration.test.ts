@@ -76,5 +76,17 @@ test('room migration preserves legacy task events and their replay ids', () => {
     assert.equal(proposed.proposal_choice, null);
     assert.equal(proposed.proposal_by, null);
     assert.deepEqual(sqlite.pragma('foreign_key_check'), []);
+    sqlite.exec(readFileSync('migrations/0007_task_parent.sql', 'utf8'));
+    const parentCols = sqlite.prepare('PRAGMA table_info(tasks)').all() as { name: string }[];
+    assert.ok(parentCols.some((column) => column.name === 'parent_task_id'));
+    const lineage = sqlite.prepare('SELECT parent_task_id FROM tasks WHERE id = ?').get(task.id) as {
+      parent_task_id: null;
+    };
+    assert.equal(lineage.parent_task_id, null);
+    sqlite.prepare('INSERT INTO tasks (id, room_id, title, owner, definition_of_done, status, created_at, updated_at, log, parent_task_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run('child', 'default', 'Child', 'Human', 'Proof', 'queued', 'then', 'then', '[]', task.id);
+    const linked = sqlite.prepare('SELECT parent_task_id FROM tasks WHERE id = ?').get('child') as { parent_task_id: string };
+    assert.equal(linked.parent_task_id, task.id);
+    assert.deepEqual(sqlite.pragma('foreign_key_check'), []);
   } finally { sqlite.close(); }
 });

@@ -44,7 +44,7 @@ export default function Transcript({ messages, tasks, author }: { messages: Mess
       follow.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
     }}>
     {!messages.length && <p className="muted">Start the conversation, or use /task to create a task here.</p>}
-    {messages.map((message) => <MessageCard key={message.id} message={message} author={author}
+    {messages.map((message) => <MessageCard key={message.id} message={message} author={author} tasks={tasks}
       task={message.body.kind === 'task' ? byId.get(message.body.taskId) : undefined} />)}
   </div>;
 }

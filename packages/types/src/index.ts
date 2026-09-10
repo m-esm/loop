@@ -3,6 +3,7 @@ import type { TaskProposal } from './proposal';
 export * from './task-status';
 export * from './composer';
 export * from './proposal';
+export * from './spawn';
 
 export type MessageBody = { kind: 'text'; text: string } | { kind: 'task'; taskId: string };
 export interface Message { id: string; roomId: string; author: string; body: MessageBody; createdAt: string }
@@ -20,6 +21,7 @@ export interface CreateTask {
   owner: string;
   definitionOfDone: string;
   agentId?: string | null;
+  parentTaskId?: string | null;
 }
 export interface Task extends CreateTask {
   roomId: string;
@@ -42,6 +44,7 @@ export interface Task extends CreateTask {
   proposal: TaskProposal | null;
   proposalChoice: string | null;
   proposalBy: string | null;
+  parentTaskId: string | null;
 }
 export interface TaskEventPayloads {
   message_created: { message: Message };

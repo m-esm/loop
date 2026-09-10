@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { INITIAL_STATUS, TASK_STATUSES, type TaskEvent } from '@loop/types';
 import { Database } from '../src/database';
 import { EventBus } from '../src/bus';
-import { TaskStore, capLog, LOG_MAX_BYTES, LOG_MAX_CHARS, LOG_MAX_LINES } from '../src/task-store';
+import { tasks } from '../src/schema';
+import { TaskStore, assertParentLink, capLog, LOG_MAX_BYTES, LOG_MAX_CHARS, LOG_MAX_LINES } from '../src/task-store';
 
 let database: Database;
 let bus: EventBus;
@@ -339,6 +340,40 @@ test('reject fails the task, keeps the proposal, and does not requeue', () => {
   assert.equal(after.proposalChoice, 'reject');
   assert.deepEqual(after.proposal, proposal);
   assert.equal(bus.latestId(), before + 1);
+});
+
+test('create validates parent existence, same room, and self-parent', () => {
+  const parent = store.create(input);
+  assert.equal(parent.parentTaskId, null);
+  const child = store.create({ ...input, title: 'Child', parentTaskId: parent.id });
+  assert.equal(child.parentTaskId, parent.id);
+  assert.equal(child.roomId, parent.roomId);
+  assert.throws(() => store.create({ ...input, title: 'Missing', parentTaskId: 'no-such-task' }), /Parent task not found/);
+  assert.throws(() => assertParentLink(child.id, child.id), /A task may not be its own parent/);
+  assert.doesNotThrow(() => assertParentLink(child.id, parent.id));
+  database.sqlite.exec("INSERT INTO rooms (id) VALUES ('other')");
+  const ts = new Date().toISOString();
+  database.db.insert(tasks).values({
+    id: 'other-task', roomId: 'other', title: 'Elsewhere', owner: 'Human', definitionOfDone: 'x',
+    status: INITIAL_STATUS, createdAt: ts, updatedAt: ts, log: [],
+  }).run();
+  assert.throws(
+    () => store.create({ ...input, title: 'Cross room', parentTaskId: 'other-task' }),
+    /Parent task is not in the same room/,
+  );
+});
+
+test('finish and send-back keep parentTaskId', () => {
+  const parent = store.create(input);
+  const child = store.create({ ...input, title: 'Child', parentTaskId: parent.id, agentId: 'echo' });
+  const claimed = store.claim(child.id, 'echo')!;
+  store.finish(claimed.id, claimed.runId!, { status: 'done', result: 'ok' });
+  const done = store.get(child.id);
+  assert.equal(done.parentTaskId, parent.id);
+  assert.equal(done.proposal, null);
+  const sent = store.review(child.id, 'rejected', 'again', 'Moshe');
+  assert.equal(sent.parentTaskId, parent.id);
+  assert.equal(sent.status, INITIAL_STATUS);
 });
 
 test('finish clears proposal_choice so a later run is a new decision', () => {
