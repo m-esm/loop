@@ -157,7 +157,9 @@ function generate(): string {
   }
 
   const migrations = gitLines(['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'apps/api/migrations/*.sql']);
-  const screenshots = gitLines(['ls-files', '-z', 'docs/screenshots']).map((path) => `${path} ${pngSize(path)}`);
+  // Same --others as migrations and specs: a screenshot written by the run that
+  // regenerates this file is still untracked, so a tracked-only listing omits it.
+  const screenshots = gitLines(['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'docs/screenshots']).map((path) => `${path} ${pngSize(path)}`);
   const insertHits: string[] = [];
   walkTs('apps', insertHits);
   walkTs('packages', insertHits);
