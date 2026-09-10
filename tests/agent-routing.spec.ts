@@ -45,7 +45,14 @@ test('two /task posts route to two different agent commands', async ({ browser, 
     api.stderr?.on('data', (chunk) => { output += chunk; });
     await expect.poll(async () => {
       if (api?.exitCode != null) throw new Error(output);
-      return request.get(`${apiUrl}/tasks`).then((response) => response.status()).catch(() => 0);
+      // A 200 only proves something answers on this port. Every spec uses 3101,
+      // so a leftover server from an earlier spec would pass this poll and then
+      // serve requests without this spec's agents.json. Require an empty task
+      // list, which only this spec's fresh database can give.
+      return request.get(`${apiUrl}/tasks`)
+        .then(async (response) => (response.status() === 200
+          && ((await response.json()) as { tasks: unknown[] }).tasks.length === 0 ? 200 : 0))
+        .catch(() => 0);
     }).toBe(200);
   }
   async function stopApi() {
@@ -85,6 +92,9 @@ test('two /task posts route to two different agent commands', async ({ browser, 
     await expect(reviewCard.locator('[data-task-result]')).toHaveText(reviewToken);
     await expect(echoCard.locator('[data-task-agent]')).toHaveCount(0);
     await expect(reviewCard.locator('[data-task-agent]')).toHaveText('Agent: reviewer');
+    // Its own file: room-chat.png is written by two other specs, so a shared
+    // path means whichever spec runs last decides what the repo shows.
+    await page.screenshot({ path: resolve('docs/screenshots/agent-routing.png') });
 
     const echoTask = await (await request.get(`${apiUrl}/tasks/${echoId}`)).json() as Task;
     const reviewTask = await (await request.get(`${apiUrl}/tasks/${reviewId}`)).json() as Task;

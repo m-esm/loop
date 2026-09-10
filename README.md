@@ -24,6 +24,11 @@ Not a Discord bot and not Hermes. Own UI, own runtime, own task store.
 
 Use Node 22 (see `.nvmrc`) and npm workspaces.
 
+Node 22 is mandatory. `better-sqlite3` is a native module compiled against the
+running Node ABI, so installing under Node 24 rebuilds it for the wrong ABI and
+every API test then fails with `NODE_MODULE_VERSION 137` against `127`. The fix
+is `nvm use`, then `rm -rf node_modules && npm ci`.
+
 ```sh
 npm ci
 npm run dev
