@@ -111,6 +111,15 @@ th, td { padding: 14px 8px; border-bottom: 1px solid #e2e6eb; vertical-align: to
 .task-result { color: #245737; }
 .task-error { color: #823232; }
 .task-verdict { color: #254a7d; }
+.task-choice { color: #245737; }
+.task-why { color: #795213; }
+.proposal-options { display: grid; gap: 6px; }
+/* Beats the global `label { display: grid }` above, which otherwise stacks the
+   radio over its text and stretches the text to the row width. */
+.proposal-options .proposal-option { display: flex; align-items: center; justify-content: flex-start; gap: 8px; font-size: 14px; }
+/* The radio has no intrinsic width, so the flex label stretches it to the full
+   row and pushes its own text to the far edge. Size it and stop it growing. */
+.proposal-options .proposal-option input[type="radio"] { flex: 0 0 auto; width: 16px; height: 16px; margin: 0; }
 .review-actions { display: flex; gap: 8px; }
 .composer { margin-bottom: 0; }
 .composer .wide { grid-column: 1 / -1; margin: 0; }

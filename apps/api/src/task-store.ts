@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { and, desc, eq, inArray } from 'drizzle-orm';
-import { INITIAL_STATUS, TASK_STATUSES, isActiveStatus, isRunningStatus, isTaskVerdict, type CreateTask, type TaskSnapshot, type TaskStatus } from '@loop/types';
+import { INITIAL_STATUS, TASK_STATUSES, isActiveStatus, isProposalChoice, isRunningStatus, isTaskVerdict, type CreateTask, type TaskProposal, type TaskSnapshot, type TaskStatus } from '@loop/types';
 import { Database } from './database';
 import { EventBus } from './bus';
 import { events, tasks } from './schema';
@@ -126,7 +126,13 @@ export class TaskStore {
         // A verdict belongs to the run it judged. A rejected task that re-runs
         // and finishes again is unreviewed, so a stale verdict would hide the
         // buttons forever. Same staleness rule as result and error.
-        const cleared = { verdict: null, verdictNote: null, verdictBy: null };
+        const cleared = {
+          verdict: null, verdictNote: null, verdictBy: null,
+          // The proposal itself goes too, not just the choice. A finished task
+          // still carrying its proposal renders a decision block for a decision
+          // already acted on, which reads as a second pending question.
+          proposal: null, proposalChoice: null, proposalBy: null,
+        };
         const fields = outcome.status === 'done'
           ? { status: outcome.status, result: outcome.result, error: null, updatedAt: ts, ...cleared }
           : { status: outcome.status, error: outcome.error, result: null, updatedAt: ts, ...cleared };
@@ -162,6 +168,51 @@ export class TaskStore {
       return {
         subject_id: id, room_id: task.roomId, ts, kind: 'task_status_changed',
         payload: { task, previousStatus: 'running' },
+      };
+    });
+    if (event.kind !== 'task_status_changed') throw new Error('Unexpected event kind');
+    return event.payload.task;
+  }
+
+  propose(id: string, runId: string, proposal: TaskProposal) {
+    const event = this.bus.emitEvent(() => {
+      const ts = new Date().toISOString();
+      const task = this.database.db.update(tasks).set({
+        status: 'needs_input', proposal, proposalChoice: null, proposalBy: null, updatedAt: ts,
+      }).where(and(eq(tasks.id, id), eq(tasks.status, 'running'), eq(tasks.runId, runId))).returning().get();
+      if (!task) {
+        this.get(id);
+        throw new RunFenceError();
+      }
+      return {
+        subject_id: id, room_id: task.roomId, ts, kind: 'task_status_changed',
+        payload: { task, previousStatus: 'running' },
+      };
+    });
+    if (event.kind !== 'task_status_changed') throw new Error('Unexpected event kind');
+    return event.payload.task;
+  }
+
+  decide(id: string, choice: string, decidedBy: string) {
+    const event = this.bus.emitEvent(() => {
+      const current = this.get(id);
+      if (current.status !== 'needs_input' || !current.proposal) {
+        throw new BadRequestException('Task is not waiting for a decision');
+      }
+      if (!isProposalChoice(current.proposal, choice)) {
+        throw new BadRequestException('choice must be one of the proposal options or discuss');
+      }
+      const ts = new Date().toISOString();
+      const task = this.database.db.update(tasks).set({
+        proposalChoice: choice, proposalBy: decidedBy, status: INITIAL_STATUS, updatedAt: ts,
+      }).where(and(eq(tasks.id, id), eq(tasks.status, 'needs_input'))).returning().get();
+      if (!task) {
+        this.get(id);
+        throw new BadRequestException('Task is not waiting for a decision');
+      }
+      return {
+        subject_id: id, room_id: task.roomId, ts, kind: 'task_status_changed',
+        payload: { task, previousStatus: 'needs_input' },
       };
     });
     if (event.kind !== 'task_status_changed') throw new Error('Unexpected event kind');

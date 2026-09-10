@@ -259,3 +259,71 @@ test('an invalid verdict string throws and writes nothing', () => {
   assert.equal(store.get(task.id).verdict, null);
   assert.throws(() => store.review('missing', 'accepted', undefined, 'Moshe'), /Task not found/);
 });
+
+const proposal = {
+  question: 'Which store?',
+  options: ['SQLite', 'Postgres'],
+  pick: 'SQLite',
+  why: 'one file, no service',
+};
+
+test('propose fences on a stale run_id and parks needs_input', () => {
+  const task = store.create(input);
+  const claimed = store.claim(task.id, 'echo')!;
+  const before = bus.latestId();
+  assert.throws(() => store.propose(task.id, 'other-run', proposal));
+  assert.equal(bus.latestId(), before);
+  assert.equal(store.get(task.id).status, 'running');
+  const parked = store.propose(claimed.id, claimed.runId!, proposal);
+  assert.equal(parked.status, 'needs_input');
+  assert.deepEqual(parked.proposal, proposal);
+  assert.equal(parked.proposalChoice, null);
+  const added = bus.since(before);
+  assert.deepEqual(added.map((event) => event.kind), ['task_status_changed']);
+  if (added[0].kind !== 'task_status_changed') throw new Error('expected status change');
+  assert.equal(added[0].payload.previousStatus, 'running');
+  assert.equal(added[0].payload.task.status, 'needs_input');
+});
+
+test('decide records a proposal option and discuss, and rejects an unknown choice', () => {
+  const task = store.create(input);
+  const claimed = store.claim(task.id, 'echo')!;
+  store.propose(claimed.id, claimed.runId!, proposal);
+  const before = bus.latestId();
+  assert.throws(() => store.decide(task.id, 'MySQL', 'Moshe'), /proposal options or discuss/);
+  assert.equal(bus.latestId(), before);
+  assert.equal(store.get(task.id).status, 'needs_input');
+  const decided = store.decide(task.id, 'Postgres', 'Moshe');
+  assert.equal(decided.status, INITIAL_STATUS);
+  assert.equal(decided.proposalChoice, 'Postgres');
+  assert.equal(decided.proposalBy, 'Moshe');
+  const added = bus.since(before);
+  assert.deepEqual(added.map((event) => event.kind), ['task_status_changed']);
+  if (added[0].kind !== 'task_status_changed') throw new Error('expected status change');
+  assert.equal(added[0].payload.previousStatus, 'needs_input');
+  assert.throws(() => store.decide(task.id, 'SQLite', 'Moshe'), /not waiting for a decision/);
+  const other = store.create({ ...input, title: 'Talk it through' });
+  const otherClaim = store.claim(other.id, 'echo')!;
+  store.propose(otherClaim.id, otherClaim.runId!, proposal);
+  const discussed = store.decide(other.id, 'discuss', 'Moshe');
+  assert.equal(discussed.proposalChoice, 'discuss');
+  assert.equal(discussed.status, INITIAL_STATUS);
+  assert.throws(() => store.decide('missing', 'SQLite', 'Moshe'), /Task not found/);
+});
+
+test('finish clears proposal_choice so a later run is a new decision', () => {
+  const task = store.create(input);
+  const claimed = store.claim(task.id, 'echo')!;
+  store.propose(claimed.id, claimed.runId!, proposal);
+  store.decide(task.id, 'Postgres', 'Moshe');
+  const rerun = store.claim(task.id, 'echo')!;
+  assert.equal(store.get(task.id).proposalChoice, 'Postgres');
+  store.finish(rerun.id, rerun.runId!, { status: 'done', result: 'chose Postgres' });
+  const done = store.get(task.id);
+  assert.equal(done.proposalChoice, null);
+  assert.equal(done.proposalBy, null);
+  // The proposal goes with the choice. Keeping it would render a decision block
+  // on a finished task for a decision already acted on.
+  assert.equal(done.proposal, null);
+  assert.equal(done.verdict, null);
+});

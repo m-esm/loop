@@ -1,6 +1,8 @@
 import type { TaskStatus } from './task-status';
+import type { TaskProposal } from './proposal';
 export * from './task-status';
 export * from './composer';
+export * from './proposal';
 
 export type MessageBody = { kind: 'text'; text: string } | { kind: 'task'; taskId: string };
 export interface Message { id: string; roomId: string; author: string; body: MessageBody; createdAt: string }
@@ -37,6 +39,9 @@ export interface Task extends CreateTask {
   verdict: TaskVerdict | null;
   verdictNote: string | null;
   verdictBy: string | null;
+  proposal: TaskProposal | null;
+  proposalChoice: string | null;
+  proposalBy: string | null;
 }
 export interface TaskEventPayloads {
   message_created: { message: Message };

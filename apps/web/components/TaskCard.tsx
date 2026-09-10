@@ -6,9 +6,11 @@ import { api } from '../lib/api';
 
 export default function TaskCard({ task, author }: { task: Task; author: string }) {
   const terminal = !isActiveStatus(task.status);
-  const waiting = task.status === 'needs_input' && !!task.question;
+  const proposing = task.status === 'needs_input' && !!task.proposal && !task.proposalChoice;
+  const waiting = task.status === 'needs_input' && !!task.question && !proposing;
   const [answer, setAnswer] = useState('');
   const [note, setNote] = useState('');
+  const [choice, setChoice] = useState(task.proposal?.pick ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const logPre = useRef<HTMLPreElement>(null);
@@ -48,6 +50,25 @@ export default function TaskCard({ task, author }: { task: Task; author: string 
       setError(err instanceof Error ? err.message : 'Review could not be sent.');
     } finally { setBusy(false); }
   }
+  async function submitDecide(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const action = submitter instanceof HTMLButtonElement ? submitter.name : '';
+    const decided = action === 'discuss' ? 'discuss' : (choice || task.proposal?.pick || '');
+    if (!decided) return;
+    setBusy(true);
+    setError('');
+    try {
+      await api(`/tasks/${task.id}/decide`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ choice: decided, decidedBy: author }),
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Decision could not be sent.');
+    } finally { setBusy(false); }
+  }
+  const selected = choice || task.proposal?.pick || '';
+  const proposal = task.proposal;
   const logCount = task.log.length;
   const logText = task.log.join('\n');
   const logSummary = isActiveStatus(task.status)
@@ -58,12 +79,33 @@ export default function TaskCard({ task, author }: { task: Task; author: string 
     const element = logPre.current;
     if (element && followLog.current) element.scrollTop = element.scrollHeight;
   }, [logText]);
-  return <div className={waiting ? 'chat-task question-card' : 'chat-task'} data-task-id={task.id}>
+  return <div className={waiting || proposing ? 'chat-task question-card' : 'chat-task'} data-task-id={task.id}>
     <h3>{task.title}</h3><span className={chipClass(task.status)}>{task.status}</span>
     <p>Owner: {task.owner}</p>
     {task.agentId && <p data-task-agent>Agent: {task.agentId}</p>}
     <p className="done-when" title={task.definitionOfDone}>Done when: {task.definitionOfDone}</p>
     {task.question && <p data-task-question className="task-question">{task.question}</p>}
+    {proposal && <div data-task-proposal>
+      <p className="task-question">{proposal.question}</p>
+      <p className="task-why">{proposal.why}</p>
+      {proposing && <form className="answer-form" onSubmit={submitDecide}>
+        <div className="proposal-options" role="radiogroup" aria-label="Proposal options">
+          {proposal.options.map((option) => <label key={option} data-proposal-option={option} className="proposal-option">
+            <input type="radio" name="proposal" value={option} checked={selected === option}
+              onChange={() => setChoice(option)} disabled={busy} />
+            {option}{option === proposal.pick ? " (agent's pick)" : ''}
+          </label>)}
+        </div>
+        {error && <p role="alert">{error}</p>}
+        <div className="review-actions">
+          <button type="submit" name="approve" disabled={busy}>Approve</button>
+          <button type="submit" name="discuss" disabled={busy}>Discuss</button>
+        </div>
+      </form>}
+    </div>}
+    {task.proposalChoice && <p data-task-choice className="task-choice">
+      {task.proposalChoice === 'discuss' ? 'Discuss' : task.proposalChoice} by {task.proposalBy ?? 'unknown'}
+    </p>}
     {waiting && <form className="answer-form" onSubmit={submit}>
       <label>Answer<textarea value={answer} onChange={(event) => setAnswer(event.target.value)}
         rows={2} maxLength={8000} required disabled={busy} /></label>

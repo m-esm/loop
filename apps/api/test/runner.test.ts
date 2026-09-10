@@ -258,6 +258,61 @@ test('wall clock kills a hung child and clears busy for the next task', async ()
   assert.equal(store.get(next.id).result, 'next');
 });
 
+test('LOOP_PROPOSE parks, then reruns with LOOP_TASK_CHOICE', async () => {
+  const payload = JSON.stringify({
+    question: 'Which store?', options: ['SQLite', 'Postgres'], pick: 'SQLite', why: 'one file, no service',
+  });
+  rebuildRunner([{
+    id: 'probe', name: 'Probe',
+    command: nodeCommand(
+      `const c=process.env.LOOP_TASK_CHOICE;if(c){process.stdout.write('chose '+c+'\\n')}else{process.stdout.write(${JSON.stringify(`LOOP_PROPOSE: ${payload}\n`)})}`,
+    ),
+  }]);
+  const task = store.create(input);
+  runner.start();
+  await waitFor(() => store.get(task.id).status === 'needs_input');
+  const parked = store.get(task.id);
+  assert.equal(parked.proposal?.pick, 'SQLite');
+  assert.deepEqual(parked.proposal?.options, ['SQLite', 'Postgres']);
+  store.decide(task.id, 'Postgres', 'Moshe');
+  await waitFor(() => store.get(task.id).status === 'done');
+  assert.equal(store.get(task.id).result, 'chose Postgres');
+  assert.equal(store.get(task.id).proposalChoice, null);
+});
+
+test('malformed LOOP_PROPOSE fails the task instead of parking it', async () => {
+  rebuildRunner([{
+    id: 'probe', name: 'Probe',
+    command: nodeCommand("process.stdout.write('LOOP_PROPOSE: {\\n')"),
+  }]);
+  const badJson = store.create({ ...input, title: 'bad json' });
+  runner.start();
+  await waitFor(() => store.get(badJson.id).status === 'failed');
+  assert.match(store.get(badJson.id).error ?? '', /Malformed proposal/);
+  runner.stop();
+  rebuildRunner([{
+    id: 'probe', name: 'Probe',
+    command: nodeCommand(
+      "process.stdout.write('LOOP_PROPOSE: '+JSON.stringify({question:'q',options:[],pick:'x',why:'y'})+'\\n')",
+    ),
+  }]);
+  const empty = store.create({ ...input, title: 'empty options' });
+  runner.start();
+  await waitFor(() => store.get(empty.id).status === 'failed');
+  assert.match(store.get(empty.id).error ?? '', /options must not be empty/);
+  runner.stop();
+  rebuildRunner([{
+    id: 'probe', name: 'Probe',
+    command: nodeCommand(
+      "process.stdout.write('LOOP_PROPOSE: '+JSON.stringify({question:'q',options:['a'],pick:'b',why:'y'})+'\\n')",
+    ),
+  }]);
+  const pick = store.create({ ...input, title: 'bad pick' });
+  runner.start();
+  await waitFor(() => store.get(pick.id).status === 'failed');
+  assert.match(store.get(pick.id).error ?? '', /pick is not one of the options/);
+});
+
 test('LOOP_ASK line parks, then reruns with LOOP_TASK_ANSWER', async () => {
   rebuildRunner([{
     id: 'probe', name: 'Probe',

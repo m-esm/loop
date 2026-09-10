@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import type { INestApplication } from '@nestjs/common';
 import { INITIAL_STATUS, TASK_STATUSES, type Task, type TaskEvent, type TaskSnapshot } from '@loop/types';
 import { createApp } from '../src/app';
+import { TaskStore } from '../src/task-store';
 
 let app: INestApplication;
 let url: string;
@@ -115,6 +116,31 @@ test('POST /tasks/:id/review validates fields and only accepts a finished task',
   assert.equal(requeued.verdict, 'rejected');
   assert.equal(requeued.verdictNote, 'send back');
   assert.equal((await review(other.id, { verdict: 'accepted', reviewedBy: 'Moshe' })).status, 400);
+});
+
+test('POST /tasks/:id/decide validates choice against the stored proposal', async () => {
+  const decide = (id: string, body: unknown) => fetch(`${url}/tasks/${id}/decide`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const queued = await create();
+  assert.equal((await decide(queued.id, { choice: 'SQLite', decidedBy: 'Moshe' })).status, 400);
+  const store = app.get(TaskStore);
+  const task = await create();
+  const claimed = store.claim(task.id, 'echo')!;
+  store.propose(claimed.id, claimed.runId!, {
+    question: 'Which store?', options: ['SQLite', 'Postgres'], pick: 'SQLite', why: 'one file, no service',
+  });
+  assert.equal((await decide(task.id, { choice: 'MySQL', decidedBy: 'Moshe' })).status, 400);
+  const ok = await decide(task.id, { choice: 'Postgres', decidedBy: 'Moshe' });
+  assert.equal(ok.status, 200);
+  const body = await ok.json() as Task;
+  assert.equal(body.status, INITIAL_STATUS);
+  assert.equal(body.proposalChoice, 'Postgres');
+  assert.equal(body.proposalBy, 'Moshe');
+  assert.equal((await decide(task.id, { choice: 'SQLite', decidedBy: 'Moshe' })).status, 400);
+  assert.equal((await decide(task.id, { choice: ' ', decidedBy: 'Moshe' })).status, 400);
+  assert.equal((await decide(task.id, { choice: 'SQLite', decidedBy: 'a'.repeat(101) })).status, 400);
+  assert.equal((await decide('missing', { choice: 'SQLite', decidedBy: 'Moshe' })).status, 404);
 });
 
 test('GET /stream replays across database pages in order, then streams live with SSE headers', async () => {
