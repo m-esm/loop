@@ -37,4 +37,29 @@ export class RoomsController {
     this.auth.requireOwner(actor(req).id, room);
     return this.agents.remove(room, id);
   }
+
+  @Get(':room/members')
+  members(@Param('room') roomParam: string, @Req() req: Request) {
+    return this.auth.listMembers(actor(req).id, roomId(roomParam));
+  }
+
+  @Get(':room/invites')
+  listInvites(@Param('room') roomParam: string, @Req() req: Request) {
+    return { invites: this.auth.listInvites(actor(req).id, roomId(roomParam)) };
+  }
+
+  @Post(':room/invites')
+  createInvite(@Param('room') roomParam: string, @Body() body: unknown, @Req() req: Request) {
+    return this.auth.createInvite(
+      actor(req).id,
+      roomId(roomParam),
+      field(body, 'email', 254),
+      field(body, 'role', 20),
+    );
+  }
+
+  @Delete(':room/invites/:id')
+  revokeInvite(@Param('room') roomParam: string, @Param('id') id: string, @Req() req: Request) {
+    return this.auth.revokeInvite(actor(req).id, roomId(roomParam), id);
+  }
 }

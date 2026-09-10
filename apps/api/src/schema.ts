@@ -32,6 +32,18 @@ export const roomMembers = sqliteTable('room_members', {
   role: text('role').$type<'owner' | 'member'>().notNull(),
 });
 
+export const invites = sqliteTable('invites', {
+  id: text('id').primaryKey(),
+  roomId: text('room_id').notNull().references(() => rooms.id),
+  email: text('email').notNull(),
+  role: text('role').$type<'owner' | 'member'>().notNull(),
+  tokenHash: text('token_hash').notNull(),
+  invitedBy: text('invited_by').notNull().references(() => principals.id),
+  createdAt: text('created_at').notNull(),
+  acceptedAt: text('accepted_at'),
+  expiresAt: text('expires_at').notNull(),
+});
+
 export const roomAgents = sqliteTable('room_agents', {
   id: text('id').primaryKey(),
   roomId: text('room_id').notNull().references(() => rooms.id),
