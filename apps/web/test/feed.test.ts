@@ -29,7 +29,7 @@ test('mixed replay keeps messages unique and a task card renders the updated tas
   assert.equal(after.messages.length, 2);
   assert.equal(before.tasks[0].status, INITIAL_STATUS);
   assert.equal(after.messages, before.messages);
-  const html = renderToStaticMarkup(createElement(MessageCard, { message: after.messages[0], task: after.tasks[0] }));
+  const html = renderToStaticMarkup(createElement(MessageCard, { message: after.messages[0], task: after.tasks[0], author: 'Human' }));
   assert.ok(html.includes(TASK_STATUSES.at(-1)!));
   assert.ok(html.includes('Build'));
 });
@@ -57,6 +57,7 @@ test('task_progress upserts the live log without adding a row', () => {
   const html = renderToStaticMarkup(createElement(MessageCard, {
     message: { id: 'card', roomId: 'default', author: 'Human', body: { kind: 'task', taskId: task.id }, createdAt: '' },
     task: { ...after.tasks[0], status: 'done', result: 'Echo: Build', log: ['Echo started', 'Echo finished'] },
+    author: 'Human',
   }));
   assert.ok(html.includes('Echo started'));
   assert.ok(html.includes('Echo: Build'));

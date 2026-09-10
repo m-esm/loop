@@ -65,6 +65,8 @@ test('question card answers in the browser and the same task reaches done', asyn
     expect((await answered).status()).toBe(200);
     await expect(colourCard.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
     await expect(colourCard.locator('[data-task-answer]')).toContainText('blue');
+    // The answer is attributed to the composer's author, not a hardcoded name.
+    await expect(colourCard.locator('[data-task-answer]')).toContainText('Moshe');
     await expect(colourCard.locator('[data-task-result]')).toHaveText('Answered: blue');
     await expect(shapeCard.locator('.tp-chip')).toHaveText('needs_input');
     await expect(shapeCard).toHaveClass(/question-card/);

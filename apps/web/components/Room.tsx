@@ -13,6 +13,7 @@ export default function Room() {
   const [state, setState] = useState<RoomFeed>({ tasks: [], messages: [] });
   const [cursors, setCursors] = useState<{ tasks: number; messages: number } | null>(null);
   const [view, setView] = useState('chat');
+  const [author, setAuthor] = useState('Human');
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
@@ -39,8 +40,8 @@ export default function Room() {
     {error && <p role="alert">{error} <button onClick={() => setAttempt((value) => value + 1)}>Retry</button></p>}
     {!cursors && !error && <p>Loading room...</p>}
     {cursors && (view === 'chat' ? <section aria-label="Chat">
-      <Transcript tasks={state.tasks} messages={state.messages} />
-      <Composer />
+      <Transcript tasks={state.tasks} messages={state.messages} author={author} />
+      <Composer author={author} onAuthorChange={setAuthor} />
     </section> : <TasksPanel tasks={state.tasks} />)}
   </>;
 }
