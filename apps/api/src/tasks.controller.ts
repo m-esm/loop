@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Get, HttpCode, Inject, Param, Patch, Post } from '@nestjs/common';
-import { isTaskStatus } from '@loop/types';
+import { isTaskStatus, isTaskVerdict } from '@loop/types';
 import { TaskStore } from './task-store';
 import { field, optionalField } from './field';
 
@@ -23,5 +23,10 @@ export class TasksController {
   }
   @Post(':id/answer') @HttpCode(200) answer(@Param('id') id: string, @Body() body: unknown) {
     return this.store.answer(id, field(body, 'answer', 8000), field(body, 'answeredBy', 100));
+  }
+  @Post(':id/review') @HttpCode(200) review(@Param('id') id: string, @Body() body: unknown) {
+    const verdict = body && typeof body === 'object' ? (body as Record<string, unknown>).verdict : undefined;
+    if (!isTaskVerdict(verdict)) throw new BadRequestException('Invalid verdict');
+    return this.store.review(id, verdict, optionalField(body, 'note', 8000), field(body, 'reviewedBy', 100));
   }
 }

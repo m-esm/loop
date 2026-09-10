@@ -7,6 +7,11 @@ export interface Message { id: string; roomId: string; author: string; body: Mes
 export interface MessageSnapshot { messages: Message[]; since: number }
 export interface CreateMessage { roomId: string; author: string; body: string }
 
+export type TaskVerdict = 'accepted' | 'rejected';
+export function isTaskVerdict(value: unknown): value is TaskVerdict {
+  return value === 'accepted' || value === 'rejected';
+}
+
 export interface CreateTask {
   roomId?: string;
   title: string;
@@ -29,6 +34,9 @@ export interface Task extends CreateTask {
   question: string | null;
   answer: string | null;
   answeredBy: string | null;
+  verdict: TaskVerdict | null;
+  verdictNote: string | null;
+  verdictBy: string | null;
 }
 export interface TaskEventPayloads {
   message_created: { message: Message };

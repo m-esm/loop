@@ -84,6 +84,39 @@ test('POST /tasks/:id/answer validates fields and only accepts needs_input', asy
   assert.equal((await answer('missing', { answer: 'blue', answeredBy: 'Moshe' })).status, 404);
 });
 
+test('POST /tasks/:id/review validates fields and only accepts a finished task', async () => {
+  const task = await create();
+  const review = (id: string, body: unknown) => fetch(`${url}/tasks/${id}/review`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  assert.equal((await review(task.id, { verdict: 'accepted', reviewedBy: 'Moshe' })).status, 400);
+  assert.equal((await fetch(`${url}/tasks/${task.id}/status`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'done' }),
+  })).status, 200);
+  const ok = await review(task.id, { verdict: 'accepted', reviewedBy: 'Moshe' });
+  assert.equal(ok.status, 200);
+  const body = await ok.json() as Task;
+  assert.equal(body.status, 'done');
+  assert.equal(body.verdict, 'accepted');
+  assert.equal(body.verdictBy, 'Moshe');
+  assert.equal((await review(task.id, { verdict: 'maybe', reviewedBy: 'Moshe' })).status, 400);
+  assert.equal((await review(task.id, { verdict: 'accepted', reviewedBy: ' ' })).status, 400);
+  assert.equal((await review(task.id, { verdict: 'accepted', reviewedBy: 'a'.repeat(101) })).status, 400);
+  assert.equal((await review(task.id, { verdict: 'accepted', note: 'a'.repeat(8001), reviewedBy: 'Moshe' })).status, 400);
+  assert.equal((await review('missing', { verdict: 'accepted', reviewedBy: 'Moshe' })).status, 404);
+  const other = await create();
+  assert.equal((await fetch(`${url}/tasks/${other.id}/status`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'failed' }),
+  })).status, 200);
+  const rejected = await review(other.id, { verdict: 'rejected', note: 'send back', reviewedBy: 'Moshe' });
+  assert.equal(rejected.status, 200);
+  const requeued = await rejected.json() as Task;
+  assert.equal(requeued.status, INITIAL_STATUS);
+  assert.equal(requeued.verdict, 'rejected');
+  assert.equal(requeued.verdictNote, 'send back');
+  assert.equal((await review(other.id, { verdict: 'accepted', reviewedBy: 'Moshe' })).status, 400);
+});
+
 test('GET /stream replays across database pages in order, then streams live with SSE headers', async () => {
   const snapshot = await (await fetch(`${url}/tasks`)).json() as TaskSnapshot;
   const count = 555;

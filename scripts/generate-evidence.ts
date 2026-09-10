@@ -253,11 +253,13 @@ function generate(): string {
     'A task with `agentId` runs that agent\'s command. An unassigned task still uses the first configured agent. An unknown id is claimed then failed through `store.finish`; it is not skipped.',
     'Stdout and stderr stream into the task log. Exit 0 finishes `done` with the last nonempty stdout line; nonzero fails with the last nonempty stderr line.',
     'An agent asks by writing a `LOOP_ASK:` line; the runner parks the task in `needs_input` and reruns the same agent with `LOOP_TASK_ANSWER` after a human answers.',
+    'A finished task can be accepted or rejected. Reject requeues the same agent, clears the previous run, and passes `LOOP_TASK_NOTE` on the next spawn.',
     'The seeded echo agent stays first and keeps the `FAIL:` and `ASK:` title conventions so existing browser specs still pass. A second seeded reviewer agent has a different command.',
-    'Claim, progress, finish, ask, and answer go through the task store; the bus remains the single `insert(events)` path.',
+    'Claim, progress, finish, ask, answer, and review go through the task store; the bus remains the single `insert(events)` path.',
     'Migration `0002_task_run.sql` adds `claimed_by`, `run_id`, `log`, `result`, and `error`.',
     'Migration `0003_task_question.sql` adds `question`, `answer`, and `answered_by`.',
     'Migration `0004_task_agent.sql` adds nullable `agent_id`.',
+    'Migration `0005_task_verdict.sql` adds nullable `verdict`, `verdict_note`, and `verdict_by`.',
     '',
   ];
 

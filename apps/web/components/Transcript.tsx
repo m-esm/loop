@@ -14,10 +14,12 @@ export default function Transcript({ messages, tasks, author }: { messages: Mess
   }, [messages, tasks]);
   // UI.md: a question is pinned until answered. Following alone is not enough.
   // An answered card shrinks when its form unmounts, which leaves `follow` stuck
-  // false, so a later parked card never scrolls into view. Re-arm on a new one.
+  // false, so a later parked card never scrolls into view. Re-pin on every
+  // render while a question waits: a card ABOVE it can grow later (a verdict
+  // form appearing on a finished task) and push the answer form below the fold.
   useEffect(() => {
     const waiting = tasks.filter((task) => task.status === 'needs_input').map((task) => task.id);
-    const fresh = waiting.some((id) => !pinned.current.has(id));
+    const fresh = waiting.length > 0;
     pinned.current = new Set(waiting);
     if (!fresh) return;
     // After paint: the answer form mounts in this same commit, and scrolling to a

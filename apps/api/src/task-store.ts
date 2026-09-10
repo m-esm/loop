@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { and, desc, eq, inArray } from 'drizzle-orm';
-import { INITIAL_STATUS, TASK_STATUSES, isRunningStatus, type CreateTask, type TaskSnapshot, type TaskStatus } from '@loop/types';
+import { INITIAL_STATUS, TASK_STATUSES, isActiveStatus, isRunningStatus, isTaskVerdict, type CreateTask, type TaskSnapshot, type TaskStatus } from '@loop/types';
 import { Database } from './database';
 import { EventBus } from './bus';
 import { events, tasks } from './schema';
@@ -177,6 +177,34 @@ export class TaskStore {
       return {
         subject_id: id, room_id: task.roomId, ts, kind: 'task_status_changed',
         payload: { task, previousStatus: 'needs_input' },
+      };
+    });
+    if (event.kind !== 'task_status_changed') throw new Error('Unexpected event kind');
+    return event.payload.task;
+  }
+
+  review(id: string, verdict: string, note: string | undefined, reviewedBy: string) {
+    const event = this.bus.emitEvent(() => {
+      if (!isTaskVerdict(verdict)) throw new BadRequestException('Invalid verdict');
+      const current = this.get(id);
+      if (isActiveStatus(current.status)) throw new BadRequestException('Task is not finished');
+      const ts = new Date().toISOString();
+      const verdictFields = {
+        verdict, verdictNote: note ?? null, verdictBy: reviewedBy, updatedAt: ts,
+      };
+      const fields = verdict === 'accepted' ? verdictFields : {
+        ...verdictFields,
+        status: INITIAL_STATUS,
+        runId: null,
+        claimedBy: null,
+        result: null,
+        error: null,
+      };
+      const task = this.database.db.update(tasks).set(fields)
+        .where(eq(tasks.id, id)).returning().get()!;
+      return {
+        subject_id: id, room_id: task.roomId, ts, kind: 'task_status_changed',
+        payload: { task, previousStatus: current.status },
       };
     });
     if (event.kind !== 'task_status_changed') throw new Error('Unexpected event kind');

@@ -12,7 +12,8 @@ function taskOf(over: Partial<Task> = {}): Task {
     id: 'task', roomId: 'default', title: 'Build', owner: 'Human', definitionOfDone: 'Proof',
     status: INITIAL_STATUS, createdAt: '', updatedAt: '',
     agentId: null, claimedBy: null, runId: null, log: [], result: null, error: null,
-    question: null, answer: null, answeredBy: null, ...over,
+    question: null, answer: null, answeredBy: null,
+    verdict: null, verdictNote: null, verdictBy: null, ...over,
   };
 }
 
@@ -39,6 +40,23 @@ test('mixed replay keeps messages unique and a task card renders the updated tas
   assert.ok(withAgent.includes('Agent: reviewer'));
   const withoutAgent = renderToStaticMarkup(createElement(TaskCard, { task: taskOf(), author: 'Human' }));
   assert.equal(withoutAgent.includes('Agent:'), false);
+  const finished = renderToStaticMarkup(createElement(TaskCard, {
+    task: taskOf({ status: 'done', result: 'ok', log: ['one', 'two'] }), author: 'Moshe',
+  }));
+  assert.ok(finished.includes('Accept'));
+  assert.ok(finished.includes('Reject'));
+  assert.ok(finished.includes('What happened · 2 lines'));
+  assert.equal(finished.includes('data-task-verdict'), false);
+  const accepted = renderToStaticMarkup(createElement(TaskCard, {
+    task: taskOf({ status: 'done', result: 'ok', verdict: 'accepted', verdictBy: 'Moshe' }), author: 'Moshe',
+  }));
+  assert.ok(accepted.includes('Accepted by Moshe'));
+  assert.equal(accepted.includes('name="accepted"'), false);
+  const running = renderToStaticMarkup(createElement(TaskCard, {
+    task: taskOf({ status: 'running', log: ['working'] }), author: 'Moshe',
+  }));
+  assert.ok(running.includes('Work in progress · 1 line'));
+  assert.equal(running.includes('Accept'), false);
 });
 
 test('replay upserts the same row and live status updates replace it', () => {
