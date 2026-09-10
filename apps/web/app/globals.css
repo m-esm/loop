@@ -4,7 +4,7 @@ body { margin: 0; }
 .shell { display: grid; grid-template-columns: 180px minmax(0, 1fr) 280px; min-height: 100vh; }
 aside { padding: 28px 20px; background: #f7f8fa; }
 .projects { border-right: 1px solid #dce0e5; }
-.context { border-left: 1px solid #dce0e5; }
+.context { border-left: 1px solid #dce0e5; overflow-y: auto; }
 main { padding: 28px 32px; min-width: 0; display: flex; flex-direction: column; height: 100vh; }
 /* The chat section owns the leftover height so the transcript can never overlap
    the composer. A hardcoded transcript height guesses the composer's size and
@@ -140,5 +140,13 @@ nav .logout { margin-left: 12px; }
 .room-agents li { display: flex; gap: 8px; align-items: center; font-size: 14px; padding: 8px 0; border-bottom: 1px solid #e2e6eb; }
 .room-agents li .muted { margin-left: auto; }
 .room-agents form { grid-template-columns: 1fr; padding: 12px; margin-bottom: 0; }
+.room-team { margin-bottom: 24px; }
+.room-team h3 { font-size: 14px; margin: 12px 0 8px; }
+.room-team ul { list-style: none; padding: 0; margin: 0 0 14px; }
+.room-team li { display: flex; gap: 8px; align-items: center; font-size: 14px; padding: 8px 0; border-bottom: 1px solid #e2e6eb; }
+.room-team li .muted { margin-left: auto; }
+.room-team form { grid-template-columns: 1fr; padding: 12px; margin-bottom: 12px; }
+.room-team .invite-once { font-size: 13px; margin-bottom: 12px; }
+.room-team .invite-link { font-size: 12px; word-break: break-all; }
 @media (max-width: 600px) { .shell { grid-template-columns: minmax(0, 1fr); } .projects { display: none; } main { padding: 16px; } }
 @media (max-width: 950px) { .shell { grid-template-columns: 130px minmax(0, 1fr); } .context { display: none; } main { padding: 20px; } }

@@ -11,6 +11,7 @@ import Composer from './Composer';
 import LoginForm from './LoginForm';
 import ProjectsRailEntry from './ProjectsRailEntry';
 import RoomAgents from './RoomAgents';
+import Team from './Team';
 
 export default function Room() {
   const [me, setMe] = useState<Me | null>(null);
@@ -70,6 +71,7 @@ export default function Room() {
   return <>
     {/* Room owns the feed; portal the rail entry so page.tsx stays a server shell. */}
     <ProjectsRailEntry count={needsHumanCount(state.tasks)} />
+    <Team room="default" />
     <RoomAgents room="default" />
     <nav aria-label="Room views">
       <span className="room-tab">

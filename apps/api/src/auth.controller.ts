@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, Inject, Post, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { actor, AuthService, type AuthedRequest } from './auth';
-import { field } from './field';
+import { field, optionalField } from './field';
 
 @Controller('auth')
 export class AuthController {
@@ -13,6 +13,7 @@ export class AuthController {
       email: field(body, 'email', 254),
       password: field(body, 'password', 200),
       displayName: field(body, 'displayName', 100),
+      inviteToken: optionalField(body, 'inviteToken', 200),
     });
     res.setHeader('Set-Cookie', this.auth.setSessionCookie(result.token));
     return result.principal;

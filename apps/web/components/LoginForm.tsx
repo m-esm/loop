@@ -30,10 +30,12 @@ export default function LoginForm({ onAuthed }: { onAuthed: (me: Me) => void }) 
     setBusy('register');
     setRegisterError('');
     try {
+      const inviteToken = new URLSearchParams(window.location.search).get('invite');
       const me = await api<Me>('/auth/register', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           displayName: data.get('displayName'), email: data.get('email'), password: data.get('password'),
+          ...(inviteToken ? { inviteToken } : {}),
         }),
       });
       onAuthed(me);
@@ -55,7 +57,7 @@ export default function LoginForm({ onAuthed }: { onAuthed: (me: Me) => void }) 
       <button type="submit" disabled={!!busy}>{busy === 'login' ? 'Signing in...' : 'Sign in'}</button>
     </form>
     <h2>Create an account</h2>
-    <p className="muted">The first operator registers on an empty database. After that, registration closes.</p>
+    <p className="muted">The first operator registers on an empty database. After that, registration closes unless you have an invite link. Loop does not send email; the owner copies the link and sends it.</p>
     <form aria-label="Create account" onSubmit={register}>
       <label>Display name<input name="displayName" required maxLength={100} disabled={!!busy} /></label>
       <label>Email<input name="email" type="email" autoComplete="username" required maxLength={254} disabled={!!busy} /></label>

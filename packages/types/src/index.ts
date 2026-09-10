@@ -22,6 +22,29 @@ export interface RoomAgentsSnapshot {
   catalog: CatalogAgent[];
   role: 'owner' | 'member';
 }
+export interface RoomMember {
+  principalId: string;
+  displayName: string;
+  email: string | null;
+  role: 'owner' | 'member';
+}
+export interface RoomMembersSnapshot {
+  members: RoomMember[];
+  role: 'owner' | 'member';
+}
+export interface RoomInvite {
+  id: string;
+  email: string;
+  role: 'owner' | 'member';
+  createdAt: string;
+  expiresAt: string;
+}
+export interface CreatedRoomInvite {
+  id: string;
+  email: string;
+  role: 'owner' | 'member';
+  token: string;
+}
 export type MessageBody = { kind: 'text'; text: string } | { kind: 'task'; taskId: string };
 export interface Message {
   id: string;
