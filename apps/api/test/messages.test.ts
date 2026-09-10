@@ -57,6 +57,7 @@ test('text emits once, task emits task then referencing message, SSE replays all
   assert.equal(task.owner, 'Human');
   assert.equal(task.definitionOfDone, 'Tests pass');
   assert.equal(task.roomId, 'default');
+  assert.equal(task.agentId, null);
   const snapshot = await (await fetch(`${url}/messages?roomId=default`)).json() as MessageSnapshot;
   assert.deepEqual(snapshot.messages, [message, card]);
   assert.equal(snapshot.since, observed.at(-1)!.id);
@@ -86,4 +87,15 @@ test('failed message event insertion rolls back its message', async () => {
     const snapshot = await (await fetch(`${url}/messages?roomId=default`)).json() as MessageSnapshot;
     assert.equal(snapshot.messages.length, 2);
   } finally { database.sqlite.exec('DROP TRIGGER reject_message_event'); }
+});
+
+test('a /task mention stores agentId and a bare @ is rejected', async () => {
+  const addressed = await post({ ...input, body: '/task @reviewer check the diff :: proof' });
+  assert.equal(addressed.status, 201);
+  const addressedCard = await addressed.json() as Message;
+  if (addressedCard.body.kind !== 'task') throw new Error('Expected task body');
+  const addressedTask = await (await fetch(`${url}/tasks/${addressedCard.body.taskId}`)).json() as { title: string; agentId: string | null };
+  assert.equal(addressedTask.title, 'check the diff');
+  assert.equal(addressedTask.agentId, 'reviewer');
+  assert.equal((await post({ ...input, body: '/task @' })).status, 400);
 });

@@ -57,7 +57,7 @@ export class TaskStore {
       const ts = new Date().toISOString();
       const task = this.database.db.insert(tasks).values({
         ...input, roomId: roomId(input.roomId ?? 'default'), id: randomUUID(), status: INITIAL_STATUS,
-        createdAt: ts, updatedAt: ts, log: [],
+        agentId: input.agentId ?? null, createdAt: ts, updatedAt: ts, log: [],
       }).returning().get();
       return { subject_id: task.id, room_id: task.roomId, ts, kind: 'task_created', payload: { task } };
     });

@@ -26,6 +26,7 @@ export default function TaskCard({ task, author }: { task: Task; author: string 
   return <div className={waiting ? 'chat-task question-card' : 'chat-task'} data-task-id={task.id}>
     <h3>{task.title}</h3><span className={chipClass(task.status)}>{task.status}</span>
     <p>Owner: {task.owner}</p>
+    {task.agentId && <p data-task-agent>Agent: {task.agentId}</p>}
     <p className="done-when" title={task.definitionOfDone}>Done when: {task.definitionOfDone}</p>
     {task.question && <p data-task-question className="task-question">{task.question}</p>}
     {waiting && <form className="answer-form" onSubmit={submit}>

@@ -35,6 +35,7 @@ export class MessageStore {
       kind: 'task', taskId: this.tasks.create({
         roomId: input.roomId, owner: input.author,
         title: parsed.title, definitionOfDone: parsed.definitionOfDone,
+        ...(parsed.agentId ? { agentId: parsed.agentId } : {}),
       }).id,
     };
     const event = this.bus.emitEvent(() => {

@@ -95,12 +95,23 @@ export class TaskRunner implements OnModuleInit, OnModuleDestroy {
 
   private claimNext() {
     if (this.busy || this.stopped) return;
-    const agent = this.agents[0];
-    if (!agent) return;
     const next = this.store.list().tasks.filter((task) => task.status === INITIAL_STATUS).at(-1);
     if (!next) return;
-    const claimed = this.store.claim(next.id, agent.id);
+    const fallback = this.agents[0];
+    if (!next.agentId && !fallback) return;
+    const resolvedId = next.agentId ?? fallback.id;
+    const agent = this.agents.find((item) => item.id === resolvedId);
+    const claimed = this.store.claim(next.id, resolvedId);
     if (!claimed?.runId) return;
+    if (!agent) {
+      const known = this.agents.map((item) => item.id).join(', ') || '(none)';
+      this.store.finish(claimed.id, claimed.runId, {
+        status: 'failed',
+        error: `Unknown agent ${resolvedId}. Known: ${known}`,
+      });
+      this.wake();
+      return;
+    }
     this.busy = true;
     defer(() => { void this.execute(claimed, agent); });
   }
