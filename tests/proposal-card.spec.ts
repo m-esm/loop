@@ -6,7 +6,7 @@ import { resolve, join } from 'node:path';
 import { once } from 'node:events';
 import type { Message, Task } from '@loop/types';
 
-test('proposal card approves another option and discuss both re-run with LOOP_TASK_CHOICE', async ({ browser, request }) => {
+test('proposal card approves, discusses, and rejects', async ({ browser, request }) => {
   const dir = mkdtempSync(join(tmpdir(), 'loop-propose-'));
   const payload = {
     question: 'Which store?',
@@ -81,29 +81,49 @@ test('proposal card approves another option and discuss both re-run with LOOP_TA
     if (talkMessage.body.kind !== 'task') throw new Error('Expected task card');
     const talkId = talkMessage.body.taskId;
 
+    await page.getByLabel('Message', { exact: true }).fill('/task Decline this :: proof');
+    const postedDecline = page.waitForResponse((response) => response.url().endsWith('/messages') && response.request().method() === 'POST');
+    await page.getByLabel('Message', { exact: true }).press('Enter');
+    const declineMessage = await (await postedDecline).json() as Message;
+    if (declineMessage.body.kind !== 'task') throw new Error('Expected task card');
+    const declineId = declineMessage.body.taskId;
+
     const storeCard = page.locator('.chat-task').filter({ hasText: 'Pick a store' });
     const talkCard = page.locator('.chat-task').filter({ hasText: 'Talk it through' });
+    const declineCard = page.locator('.chat-task').filter({ hasText: 'Decline this' });
     await expect(storeCard.locator('.tp-chip')).toHaveText('needs_input', { timeout: 10_000 });
     await expect(talkCard.locator('.tp-chip')).toHaveText('needs_input', { timeout: 10_000 });
+    await expect(declineCard.locator('.tp-chip')).toHaveText('needs_input', { timeout: 10_000 });
     await expect(storeCard.locator('[data-task-proposal]')).toContainText('Which store?');
     await expect(storeCard.locator('[data-proposal-option="SQLite"] input')).toBeChecked();
     await expect(storeCard.locator('[data-proposal-option="SQLite"]')).toContainText("agent's pick");
     await expect(storeCard.locator('[data-proposal-option="Postgres"] input')).not.toBeChecked();
     await expect(storeCard.getByRole('button', { name: 'Approve', exact: true })).toBeVisible();
+    await expect(storeCard.getByRole('button', { name: 'Reject', exact: true })).toBeVisible();
     await expect(storeCard.getByRole('button', { name: 'Discuss', exact: true })).toBeVisible();
-    // Two cards park at once and one card is taller than half the transcript, so
-    // both cannot be on screen together. The pin shows the newest arrival, so
+    // Three cards park at once and one card is taller than half the transcript, so
+    // they cannot be on screen together. The pin shows the newest arrival, so
     // reach the older one the way a human does, by scrolling to it.
     await storeCard.scrollIntoViewIfNeeded();
     await expect(storeCard.getByRole('button', { name: 'Approve', exact: true })).toBeInViewport({ ratio: 1 });
+    await expect(storeCard.getByRole('button', { name: 'Reject', exact: true })).toBeInViewport({ ratio: 1 });
     // A control that renders is not a control that renders correctly. An unsized
     // radio stretches to the row width and pushes its own label off the edge,
     // which every presence and viewport assertion happily passes.
     const radioWidth = await storeCard.locator('[data-proposal-option="SQLite"] input')
       .evaluate((el) => Math.round(el.getBoundingClientRect().width));
     expect(radioWidth).toBeLessThan(40);
+    const rejectBox = await storeCard.getByRole('button', { name: 'Reject', exact: true })
+      .evaluate((el) => {
+        const box = el.getBoundingClientRect();
+        return { width: Math.round(box.width), height: Math.round(box.height) };
+      });
+    expect(rejectBox.width).toBeGreaterThan(40);
+    expect(rejectBox.width).toBeLessThan(200);
+    expect(rejectBox.height).toBeGreaterThan(20);
+    expect(rejectBox.height).toBeLessThan(60);
     await expect(storeCard.locator('[data-proposal-option="Postgres"]')).toBeInViewport({ ratio: 1 });
-    await expect(page.locator('[data-needs-human]')).toHaveAttribute('data-needs-human', '2');
+    await expect(page.locator('[data-needs-human]')).toHaveAttribute('data-needs-human', '3');
 
     await page.screenshot({ path: resolve('docs/screenshots/proposal-card.png') });
 
@@ -126,6 +146,26 @@ test('proposal card approves another option and discuss both re-run with LOOP_TA
     await expect(talkCard.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
     await expect(talkCard.locator('[data-task-result]')).toHaveText('chose discuss');
 
+    const parkedDecline = await (await request.get(`${apiUrl}/tasks/${declineId}`)).json() as Task;
+    expect(parkedDecline.status).toBe('needs_input');
+    const parkedRunId = parkedDecline.runId;
+    const parkedClaimedBy = parkedDecline.claimedBy;
+    await declineCard.scrollIntoViewIfNeeded();
+    const rejected = page.waitForResponse((response) => response.url().includes('/decide') && response.request().method() === 'POST');
+    await declineCard.getByRole('button', { name: 'Reject', exact: true }).click();
+    const rejectedResponse = await rejected;
+    expect(rejectedResponse.status()).toBe(200);
+    const declined = await rejectedResponse.json() as Task;
+    expect(declined.status).toBe('failed');
+    expect(declined.proposalChoice).toBe('reject');
+    expect(declined.error).toBe('Proposal rejected by Moshe: SQLite');
+    await expect(declineCard.locator('.tp-chip')).toHaveText('failed');
+    await expect(declineCard.locator('[data-task-choice]')).toHaveText('Reject by Moshe');
+    await expect(declineCard.locator('[data-task-error]')).toHaveText('Proposal rejected by Moshe: SQLite');
+    await expect(declineCard.locator('[data-task-proposal]')).toBeVisible();
+    await expect(declineCard.getByRole('button', { name: 'Approve', exact: true })).toHaveCount(0);
+    await expect(declineCard.locator('[data-task-result]')).toHaveCount(0);
+
     const storeTask = await (await request.get(`${apiUrl}/tasks/${storeId}`)).json() as Task;
     const talkTask = await (await request.get(`${apiUrl}/tasks/${talkId}`)).json() as Task;
     expect(storeTask.status).toBe('done');
@@ -138,6 +178,25 @@ test('proposal card approves another option and discuss both re-run with LOOP_TA
     expect(talkTask.status).toBe('done');
     expect(talkTask.result).toBe('chose discuss');
     expect(talkTask.proposalChoice).toBeNull();
+
+    const declineTask = await (await request.get(`${apiUrl}/tasks/${declineId}`)).json() as Task;
+    expect(declineTask.status).toBe('failed');
+    expect(declineTask.error).toBe('Proposal rejected by Moshe: SQLite');
+    expect(declineTask.proposalChoice).toBe('reject');
+    expect(declineTask.proposalBy).toBe('Moshe');
+    expect(declineTask.proposal).toEqual(payload);
+    expect(declineTask.runId).toBe(parkedRunId);
+    expect(declineTask.claimedBy).toBe(parkedClaimedBy);
+    expect(declineTask.result).toBeNull();
+    await expect.poll(async () => {
+      const row = await (await request.get(`${apiUrl}/tasks/${declineId}`)).json() as Task;
+      return row.status === 'failed'
+        && row.runId === parkedRunId
+        && row.claimedBy === parkedClaimedBy
+        && row.result === null
+        && row.proposalChoice === 'reject'
+        && row.proposal !== null;
+    }).toBe(true);
   } finally {
     await Promise.all(contexts.map((item) => item.close()));
     await stopApi();

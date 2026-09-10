@@ -54,7 +54,9 @@ export default function TaskCard({ task, author }: { task: Task; author: string 
     event.preventDefault();
     const submitter = (event.nativeEvent as SubmitEvent).submitter;
     const action = submitter instanceof HTMLButtonElement ? submitter.name : '';
-    const decided = action === 'discuss' ? 'discuss' : (choice || task.proposal?.pick || '');
+    const decided = action === 'discuss' || action === 'reject'
+      ? action
+      : (choice || task.proposal?.pick || '');
     if (!decided) return;
     setBusy(true);
     setError('');
@@ -99,12 +101,13 @@ export default function TaskCard({ task, author }: { task: Task; author: string 
         {error && <p role="alert">{error}</p>}
         <div className="review-actions">
           <button type="submit" name="approve" disabled={busy}>Approve</button>
+          <button type="submit" name="reject" disabled={busy}>Reject</button>
           <button type="submit" name="discuss" disabled={busy}>Discuss</button>
         </div>
       </form>}
     </div>}
     {task.proposalChoice && <p data-task-choice className="task-choice">
-      {task.proposalChoice === 'discuss' ? 'Discuss' : task.proposalChoice} by {task.proposalBy ?? 'unknown'}
+      {task.proposalChoice === 'discuss' ? 'Discuss' : task.proposalChoice === 'reject' ? 'Reject' : task.proposalChoice} by {task.proposalBy ?? 'unknown'}
     </p>}
     {waiting && <form className="answer-form" onSubmit={submit}>
       <label>Answer<textarea value={answer} onChange={(event) => setAnswer(event.target.value)}

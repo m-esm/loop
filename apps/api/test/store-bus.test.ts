@@ -290,7 +290,7 @@ test('decide records a proposal option and discuss, and rejects an unknown choic
   const claimed = store.claim(task.id, 'echo')!;
   store.propose(claimed.id, claimed.runId!, proposal);
   const before = bus.latestId();
-  assert.throws(() => store.decide(task.id, 'MySQL', 'Moshe'), /proposal options or discuss/);
+  assert.throws(() => store.decide(task.id, 'MySQL', 'Moshe'), /proposal options, discuss, or reject/);
   assert.equal(bus.latestId(), before);
   assert.equal(store.get(task.id).status, 'needs_input');
   const decided = store.decide(task.id, 'Postgres', 'Moshe');
@@ -309,6 +309,36 @@ test('decide records a proposal option and discuss, and rejects an unknown choic
   assert.equal(discussed.proposalChoice, 'discuss');
   assert.equal(discussed.status, INITIAL_STATUS);
   assert.throws(() => store.decide('missing', 'SQLite', 'Moshe'), /Task not found/);
+});
+
+test('reject fails the task, keeps the proposal, and does not requeue', () => {
+  const task = store.create(input);
+  const claimed = store.claim(task.id, 'echo')!;
+  store.propose(claimed.id, claimed.runId!, proposal);
+  const before = bus.latestId();
+  const rejected = store.decide(task.id, 'reject', 'Moshe');
+  assert.equal(rejected.status, 'failed');
+  assert.equal(rejected.error, 'Proposal rejected by Moshe: SQLite');
+  assert.equal(rejected.proposalChoice, 'reject');
+  assert.equal(rejected.proposalBy, 'Moshe');
+  assert.deepEqual(rejected.proposal, proposal);
+  assert.equal(rejected.runId, claimed.runId);
+  assert.equal(rejected.claimedBy, 'echo');
+  assert.equal(rejected.result, null);
+  const added = bus.since(before);
+  assert.deepEqual(added.map((event) => event.kind), ['task_status_changed']);
+  if (added[0].kind !== 'task_status_changed') throw new Error('expected status change');
+  assert.equal(added[0].payload.previousStatus, 'needs_input');
+  assert.equal(added[0].payload.task.status, 'failed');
+  assert.equal(store.claim(task.id, 'echo'), null);
+  const after = store.get(task.id);
+  assert.equal(after.status, 'failed');
+  assert.equal(after.runId, claimed.runId);
+  assert.equal(after.claimedBy, 'echo');
+  assert.equal(after.result, null);
+  assert.equal(after.proposalChoice, 'reject');
+  assert.deepEqual(after.proposal, proposal);
+  assert.equal(bus.latestId(), before + 1);
 });
 
 test('finish clears proposal_choice so a later run is a new decision', () => {

@@ -55,5 +55,5 @@ export function parseTaskProposal(raw: string): { proposal: TaskProposal } | { e
 }
 
 export function isProposalChoice(proposal: TaskProposal, choice: string): boolean {
-  return choice === 'discuss' || proposal.options.includes(choice);
+  return choice === 'discuss' || choice === 'reject' || proposal.options.includes(choice);
 }
