@@ -5,9 +5,12 @@ import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { once } from 'node:events';
 import type { Message } from '@loop/types';
+import { authedContext, seedSession, withAuth } from './auth';
 
-test('question card answers in the browser and the same task reaches done', async ({ browser, request }) => {
+test('question card answers in the browser and the same task reaches done', async ({ browser, request: raw }) => {
   const dir = mkdtempSync(join(tmpdir(), 'loop-ask-'));
+  const session = seedSession(join(dir, 'loop.sqlite'));
+  const request = withAuth(raw, session.token);
   let api: ChildProcess | undefined;
   let output = '';
   const contexts: BrowserContext[] = [];
@@ -42,13 +45,12 @@ test('question card answers in the browser and the same task reaches done', asyn
   }
   try {
     await startApi();
-    const a = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const a = await authedContext(browser, session.token);
     contexts.push(a);
     const page = await a.newPage();
     await page.goto('http://127.0.0.1:3100');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
 
-    await page.getByLabel('Author', { exact: true }).fill('Moshe');
     await page.getByLabel('Message', { exact: true }).fill('/task ASK: what colour :: proof');
     const posted = page.waitForResponse((response) => response.url().endsWith('/messages') && response.request().method() === 'POST');
     await page.getByLabel('Message', { exact: true }).press('Enter');

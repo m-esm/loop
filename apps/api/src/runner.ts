@@ -8,6 +8,7 @@ import { INITIAL_STATUS, parseTaskProposal, parseTaskSpawn, type Task } from '@l
 import { loadAgents, type AgentConfig } from './agents';
 import { EventBus } from './bus';
 import { MessageStore } from './message-store';
+import { syncAgentPrincipals } from './principals';
 import { RunFenceError, TaskStore } from './task-store';
 
 const PROGRESS_MIN_INTERVAL_MS = 500;
@@ -74,6 +75,7 @@ export class TaskRunner implements OnModuleInit, OnModuleDestroy {
     if (this.started) return;
     this.started = true;
     this.stopped = false;
+    syncAgentPrincipals(this.store.database, this.agents);
     this.store.reclaimLost();
     this.unsubscribe = this.bus.subscribe((event) => {
       if (event.kind === 'task_created' || event.kind === 'task_status_changed') this.wake();
@@ -189,13 +191,14 @@ export class TaskRunner implements OnModuleInit, OnModuleDestroy {
         try {
           const childTask = this.store.create({
             roomId: task.roomId,
-            owner: task.owner,
+            owner: agent.name,
+            ownerPrincipalId: agent.id,
             title: parsed.spawn.title,
             definitionOfDone: parsed.spawn.definitionOfDone,
             parentTaskId: id,
             ...(parsed.spawn.agentId ? { agentId: parsed.spawn.agentId } : {}),
           });
-          this.messages.attachTask(task.roomId, task.owner, childTask.id);
+          this.messages.attachTask(task.roomId, agent.name, childTask.id, agent.id);
         } catch (error) {
           const reason = error instanceof Error ? error.message : 'spawn failed';
           push(reason, 'stderr');

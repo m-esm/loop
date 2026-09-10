@@ -387,6 +387,8 @@ test('finish clears proposal_choice so a later run is a new decision', () => {
   const done = store.get(task.id);
   assert.equal(done.proposalChoice, null);
   assert.equal(done.proposalBy, null);
+  assert.equal(done.proposalByPrincipalId, null);
+  assert.equal(done.verdictByPrincipalId, null);
   // The proposal goes with the choice. Keeping it would render a decision block
   // on a finished task for a decision already acted on.
   assert.equal(done.proposal, null);

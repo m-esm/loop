@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter } from 'node:events';
-import { asc, desc, gt } from 'drizzle-orm';
+import { and, asc, desc, gt, inArray } from 'drizzle-orm';
 import type { TaskEvent } from '@loop/types';
 import { Database } from './database';
 import { events } from './schema';
@@ -31,8 +31,12 @@ export class EventBus {
     return () => { this.bus.off('event', safe); };
   }
 
-  since(id: number, limit = 500): TaskEvent[] {
-    return this.database.db.select().from(events).where(gt(events.id, id))
+  since(id: number, rooms?: string[], limit = 500): TaskEvent[] {
+    if (rooms && rooms.length === 0) return [];
+    const cond = rooms
+      ? and(gt(events.id, id), inArray(events.room_id, rooms))
+      : gt(events.id, id);
+    return this.database.db.select().from(events).where(cond)
       .orderBy(asc(events.id)).limit(limit).all() as TaskEvent[];
   }
 

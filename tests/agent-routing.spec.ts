@@ -5,9 +5,12 @@ import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { once } from 'node:events';
 import type { Message, Task } from '@loop/types';
+import { authedContext, seedSession, withAuth } from './auth';
 
-test('two /task posts route to two different agent commands', async ({ browser, request }) => {
+test('two /task posts route to two different agent commands', async ({ browser, request: raw }) => {
   const dir = mkdtempSync(join(tmpdir(), 'loop-route-'));
+  const session = seedSession(join(dir, 'loop.sqlite'));
+  const request = withAuth(raw, session.token);
   const echoToken = `echo-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const reviewToken = `review-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   writeFileSync(join(dir, 'agents.json'), JSON.stringify({
@@ -65,13 +68,12 @@ test('two /task posts route to two different agent commands', async ({ browser, 
   }
   try {
     await startApi();
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const context = await authedContext(browser, session.token);
     contexts.push(context);
     const page = await context.newPage();
     await page.goto('http://127.0.0.1:3100');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
 
-    await page.getByLabel('Author', { exact: true }).fill('Moshe');
     await page.getByLabel('Message', { exact: true }).fill('/task Unassigned probe :: proof');
     const postedEcho = page.waitForResponse((response) => response.url().endsWith('/messages') && response.request().method() === 'POST');
     await page.getByLabel('Message', { exact: true }).press('Enter');

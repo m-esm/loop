@@ -36,7 +36,9 @@ npm run dev
 
 Open http://localhost:3000 in two tabs. Create a task in one tab and watch it
 appear in the other. The API listens on `127.0.0.1:3001`. Both apps bind only
-to the local machine. This bootstrap has one room and no authentication.
+to the local machine. Identity is a local email and password with an opaque
+`loop_session` cookie in SQLite. The first operator registers; after that,
+registration closes unless `LOOP_ALLOW_REGISTER=1`.
 
 The store uses **Drizzle ORM with better-sqlite3**. Checked-in migrations in
 `apps/api/migrations` run at API startup. The default database is
@@ -83,7 +85,9 @@ Events contain full task rows, so creates and changes update the list in place
 without polling or re-fetching it. Reconnects use jittered exponential backoff,
 wait while the tab is hidden, and resume from the last accepted event id.
 
-`POST /api/tasks` accepts `title`, `owner`, and `definitionOfDone`.
+`POST /api/tasks` accepts `title` and `definitionOfDone`. The session principal
+is the owner. `POST /api/auth/register`, `POST /api/auth/login`,
+`POST /api/auth/logout`, and `GET /api/auth/me` are the identity endpoints.
 `GET /api/tasks/:id` reads a single task. `PATCH /api/tasks/:id/status` accepts
 `{ "status": <value from the shared vocabulary> }`. Unknown statuses and invalid
 input return 400; missing tasks return 404. Status changes currently accept any

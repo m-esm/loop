@@ -5,9 +5,12 @@ import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { once } from 'node:events';
 import type { Message, Task, TaskEvent } from '@loop/types';
+import { authedContext, cookieHeader, seedSession, withAuth } from './auth';
 
-test('echo runner finishes /task without PATCH and fails FAIL: titles', async ({ browser, request }) => {
+test('echo runner finishes /task without PATCH and fails FAIL: titles', async ({ browser, request: raw }) => {
   const dir = mkdtempSync(join(tmpdir(), 'loop-echo-'));
+  const session = seedSession(join(dir, 'loop.sqlite'));
+  const request = withAuth(raw, session.token);
   let api: ChildProcess | undefined;
   let output = '';
   const contexts: BrowserContext[] = [];
@@ -42,8 +45,8 @@ test('echo runner finishes /task without PATCH and fails FAIL: titles', async ({
   }
   try {
     await startApi();
-    const a = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-    const b = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const a = await authedContext(browser, session.token);
+    const b = await authedContext(browser, session.token);
     contexts.push(a, b);
     const tabA = await a.newPage();
     const tabB = await b.newPage();
@@ -51,7 +54,7 @@ test('echo runner finishes /task without PATCH and fails FAIL: titles', async ({
     await expect(tabA.locator('[data-live]')).toHaveAttribute('data-live', '1');
     await expect(tabB.locator('[data-live]')).toHaveAttribute('data-live', '1');
 
-    const stream = await fetch(`${apiUrl}/stream?since=0`);
+    const stream = await fetch(`${apiUrl}/stream?since=0`, { headers: cookieHeader(session.token) });
     const reader = stream.body!.getReader();
     let buffer = '';
     const events: TaskEvent[] = [];
@@ -71,7 +74,6 @@ test('echo runner finishes /task without PATCH and fails FAIL: titles', async ({
     };
     const pumping = pump();
 
-    await tabA.getByLabel('Author', { exact: true }).fill('Moshe');
     await tabA.getByLabel('Message', { exact: true }).fill('/task Echo me :: proof');
     const posted = tabA.waitForResponse((response) => response.url().endsWith('/messages') && response.request().method() === 'POST');
     await tabA.getByLabel('Message', { exact: true }).press('Enter');

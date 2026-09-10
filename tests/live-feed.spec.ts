@@ -5,9 +5,12 @@ import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { once } from 'node:events';
 import { TASK_STATUSES, isRunningStatus, isActiveStatus, type Message, type Task, type TaskSnapshot } from '@loop/types';
+import { authedContext, seedSession, withAuth } from './auth';
 
-test('two tabs receive creates and status changes, then reconnect and replay after API restart', async ({ browser, request }) => {
+test('two tabs receive creates and status changes, then reconnect and replay after API restart', async ({ browser, request: raw }) => {
   const dir = mkdtempSync(join(tmpdir(), 'loop-e2e-'));
+  const session = seedSession(join(dir, 'loop.sqlite'));
+  const request = withAuth(raw, session.token);
   let api: ChildProcess | undefined;
   let output = '';
   const contexts: BrowserContext[] = [];
@@ -44,8 +47,8 @@ test('two tabs receive creates and status changes, then reconnect and replay aft
   }
   try {
     await startApi();
-    const a = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-    const b = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const a = await authedContext(browser, session.token);
+    const b = await authedContext(browser, session.token);
     contexts.push(a, b);
     const tabA = await a.newPage();
     const tabB = await b.newPage();
@@ -65,7 +68,6 @@ test('two tabs receive creates and status changes, then reconnect and replay aft
     await tabA.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(tabA.locator('.composer').getByRole('alert')).toContainText('Unknown command');
     expect(messagePosts).toBe(0);
-    await tabA.getByLabel('Author', { exact: true }).fill('Moshe');
     await tabA.getByLabel('Message', { exact: true }).fill('Hello room');
     await tabA.getByLabel('Message', { exact: true }).press('Shift+Enter');
     await tabA.getByLabel('Message', { exact: true }).press('Enter');
@@ -82,13 +84,13 @@ test('two tabs receive creates and status changes, then reconnect and replay aft
     await expect(chatCard.locator('.tp-chip')).toHaveText(chatStatus);
     await tabB.screenshot({ path: '/tmp/loop-chat.png' });
     for (let i = 0; i < 14; i++) {
-      await request.post(`${apiUrl}/messages`, { data: { roomId: 'default', author: 'Human', body: `History ${i}` } });
+      await request.post(`${apiUrl}/messages`, { data: { roomId: 'default', body: `History ${i}` } });
     }
     const transcript = tabB.getByRole('log');
     await expect(transcript).toContainText('History 13');
     await expect.poll(() => transcript.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThan(80);
     await transcript.evaluate((el) => { el.scrollTop = 0; el.dispatchEvent(new Event('scroll')); });
-    await request.post(`${apiUrl}/messages`, { data: { roomId: 'default', author: 'Human', body: 'Keep reading history' } });
+    await request.post(`${apiUrl}/messages`, { data: { roomId: 'default', body: 'Keep reading history' } });
     await expect(transcript).toContainText('Keep reading history');
     expect(await transcript.evaluate((el) => el.scrollTop)).toBe(0);
     expect(streamCount).toBe(0);
@@ -101,7 +103,6 @@ test('two tabs receive creates and status changes, then reconnect and replay aft
       if (req.url().includes('/stream')) streamUrls.push(req.url());
     });
     await tabA.getByLabel('Title', { exact: true }).fill('Stream a new task across tabs');
-    await tabA.getByLabel('Owner', { exact: true }).fill('Moshe');
     await tabA.getByLabel('Definition of done').fill('The second tab shows this task without a reload.');
     const started = Date.now();
     await tabA.getByRole('button', { name: 'Create task', exact: true }).click();
@@ -133,7 +134,7 @@ test('two tabs receive creates and status changes, then reconnect and replay aft
     await Promise.all([a.setOffline(true), b.setOffline(true)]);
     await startApi();
     const missed = await request.post(`${apiUrl}/tasks`, { data: {
-      title: 'Replay the task created while disconnected', owner: 'Builder', definitionOfDone: 'Exactly one row appears after reconnection.',
+      title: 'Replay the task created while disconnected', definitionOfDone: 'Exactly one row appears after reconnection.',
     } });
     expect(missed.status()).toBe(201);
     const missedTask = await missed.json() as Task;
@@ -155,7 +156,7 @@ test('two tabs receive creates and status changes, then reconnect and replay aft
     expect(hiddenReconnects).toHaveLength(1);
     console.log('Tab A made no reconnect attempts while simulated hidden; visibilitychange triggered one reconnect and replay.');
     const third = await request.post(`${apiUrl}/tasks`, { data: {
-      title: 'Verify the live task list', owner: 'Reviewer', definitionOfDone: 'Lint, tests, build and browser verification pass.',
+      title: 'Verify the live task list', definitionOfDone: 'Lint, tests, build and browser verification pass.',
     } });
     expect(third.status()).toBe(201);
     const thirdTask = await third.json() as Task;

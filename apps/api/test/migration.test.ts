@@ -88,5 +88,19 @@ test('room migration preserves legacy task events and their replay ids', () => {
     const linked = sqlite.prepare('SELECT parent_task_id FROM tasks WHERE id = ?').get('child') as { parent_task_id: string };
     assert.equal(linked.parent_task_id, task.id);
     assert.deepEqual(sqlite.pragma('foreign_key_check'), []);
+    sqlite.exec(readFileSync('migrations/0008_auth.sql', 'utf8'));
+    const authCols = sqlite.prepare('PRAGMA table_info(principals)').all() as { name: string }[];
+    assert.deepEqual(authCols.map((column) => column.name), ['id', 'kind', 'display_name', 'disabled_at', 'created_at']);
+    const taskAuth = sqlite.prepare('PRAGMA table_info(tasks)').all() as { name: string }[];
+    assert.ok(taskAuth.some((column) => column.name === 'owner_principal_id'));
+    assert.ok(taskAuth.some((column) => column.name === 'answered_by_principal_id'));
+    assert.ok(taskAuth.some((column) => column.name === 'verdict_by_principal_id'));
+    assert.ok(taskAuth.some((column) => column.name === 'proposal_by_principal_id'));
+    const leftover = sqlite.prepare('SELECT owner, owner_principal_id FROM tasks WHERE id = ?').get(task.id) as {
+      owner: string; owner_principal_id: null;
+    };
+    assert.equal(leftover.owner, 'Human');
+    assert.equal(leftover.owner_principal_id, null);
+    assert.deepEqual(sqlite.pragma('foreign_key_check'), []);
   } finally { sqlite.close(); }
 });

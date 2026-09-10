@@ -41,13 +41,18 @@ export function capLog(lines: string[]): string[] {
 @Injectable()
 export class TaskStore {
   constructor(
-    @Inject(Database) private readonly database: Database,
+    @Inject(Database) readonly database: Database,
     @Inject(EventBus) private readonly bus: EventBus,
   ) {}
 
-  list(): TaskSnapshot {
+  list(roomIds?: string[]): TaskSnapshot {
     return this.database.sqlite.transaction(() => ({
-      tasks: this.database.db.select().from(tasks).orderBy(desc(tasks.createdAt), desc(tasks.id)).all(),
+      tasks: (roomIds
+        ? (roomIds.length
+          ? this.database.db.select().from(tasks).where(inArray(tasks.roomId, roomIds))
+            .orderBy(desc(tasks.createdAt), desc(tasks.id)).all()
+          : [])
+        : this.database.db.select().from(tasks).orderBy(desc(tasks.createdAt), desc(tasks.id)).all()),
       since: this.bus.latestId(),
     }))();
   }
@@ -71,7 +76,8 @@ export class TaskStore {
         if (parent.roomId !== room) throw new BadRequestException('Parent task is not in the same room');
       }
       const task = this.database.db.insert(tasks).values({
-        title: input.title, owner: input.owner, definitionOfDone: input.definitionOfDone,
+        title: input.title, owner: input.owner, ownerPrincipalId: input.ownerPrincipalId ?? null,
+        definitionOfDone: input.definitionOfDone,
         roomId: room, id, status: INITIAL_STATUS,
         agentId: input.agentId ?? null, parentTaskId, createdAt: ts, updatedAt: ts, log: [],
       }).returning().get();
@@ -143,11 +149,11 @@ export class TaskStore {
         // and finishes again is unreviewed, so a stale verdict would hide the
         // buttons forever. Same staleness rule as result and error.
         const cleared = {
-          verdict: null, verdictNote: null, verdictBy: null,
+          verdict: null, verdictNote: null, verdictBy: null, verdictByPrincipalId: null,
           // The proposal itself goes too, not just the choice. A finished task
           // still carrying its proposal renders a decision block for a decision
           // already acted on, which reads as a second pending question.
-          proposal: null, proposalChoice: null, proposalBy: null,
+          proposal: null, proposalChoice: null, proposalBy: null, proposalByPrincipalId: null,
         };
         const fields = outcome.status === 'done'
           ? { status: outcome.status, result: outcome.result, error: null, updatedAt: ts, ...cleared }
@@ -194,7 +200,7 @@ export class TaskStore {
     const event = this.bus.emitEvent(() => {
       const ts = new Date().toISOString();
       const task = this.database.db.update(tasks).set({
-        status: 'needs_input', proposal, proposalChoice: null, proposalBy: null, updatedAt: ts,
+        status: 'needs_input', proposal, proposalChoice: null, proposalBy: null, proposalByPrincipalId: null, updatedAt: ts,
       }).where(and(eq(tasks.id, id), eq(tasks.status, 'running'), eq(tasks.runId, runId))).returning().get();
       if (!task) {
         this.get(id);
@@ -209,7 +215,7 @@ export class TaskStore {
     return event.payload.task;
   }
 
-  decide(id: string, choice: string, decidedBy: string) {
+  decide(id: string, choice: string, decidedBy: string, decidedByPrincipalId?: string | null) {
     const event = this.bus.emitEvent(() => {
       const current = this.get(id);
       if (current.status !== 'needs_input' || !current.proposal) {
@@ -220,17 +226,16 @@ export class TaskStore {
       }
       const ts = new Date().toISOString();
       const declined = choice === 'reject';
+      const actor = { proposalChoice: choice, proposalBy: decidedBy, proposalByPrincipalId: decidedByPrincipalId ?? null };
       const fields = declined
         ? {
-            proposalChoice: choice,
-            proposalBy: decidedBy,
+            ...actor,
             status: 'failed' as const,
             error: `Proposal rejected by ${decidedBy}: ${current.proposal.pick}`,
             updatedAt: ts,
           }
         : {
-            proposalChoice: choice,
-            proposalBy: decidedBy,
+            ...actor,
             status: INITIAL_STATUS,
             updatedAt: ts,
           };
@@ -249,11 +254,11 @@ export class TaskStore {
     return event.payload.task;
   }
 
-  answer(id: string, answer: string, answeredBy: string) {
+  answer(id: string, answer: string, answeredBy: string, answeredByPrincipalId?: string | null) {
     const event = this.bus.emitEvent(() => {
       const ts = new Date().toISOString();
       const task = this.database.db.update(tasks).set({
-        answer, answeredBy, status: INITIAL_STATUS, updatedAt: ts,
+        answer, answeredBy, answeredByPrincipalId: answeredByPrincipalId ?? null, status: INITIAL_STATUS, updatedAt: ts,
       }).where(and(eq(tasks.id, id), eq(tasks.status, 'needs_input'))).returning().get();
       if (!task) {
         this.get(id);
@@ -268,14 +273,15 @@ export class TaskStore {
     return event.payload.task;
   }
 
-  review(id: string, verdict: string, note: string | undefined, reviewedBy: string) {
+  review(id: string, verdict: string, note: string | undefined, reviewedBy: string, reviewedByPrincipalId?: string | null) {
     const event = this.bus.emitEvent(() => {
       if (!isTaskVerdict(verdict)) throw new BadRequestException('Invalid verdict');
       const current = this.get(id);
       if (isActiveStatus(current.status)) throw new BadRequestException('Task is not finished');
       const ts = new Date().toISOString();
       const verdictFields = {
-        verdict, verdictNote: note ?? null, verdictBy: reviewedBy, updatedAt: ts,
+        verdict, verdictNote: note ?? null, verdictBy: reviewedBy,
+        verdictByPrincipalId: reviewedByPrincipalId ?? null, updatedAt: ts,
       };
       const fields = verdict === 'accepted' ? verdictFields : {
         ...verdictFields,

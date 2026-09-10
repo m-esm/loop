@@ -3,11 +3,41 @@ import type { EventKind, MessageBody, TaskEvent, TaskProposal, TaskStatus, TaskV
 
 export const rooms = sqliteTable('rooms', { id: text('id').primaryKey() });
 
+export const principals = sqliteTable('principals', {
+  id: text('id').primaryKey(),
+  kind: text('kind').$type<'human' | 'agent'>().notNull(),
+  displayName: text('display_name').notNull(),
+  disabledAt: text('disabled_at'),
+  createdAt: text('created_at').notNull(),
+});
+
+export const credentials = sqliteTable('credentials', {
+  principalId: text('principal_id').primaryKey().references(() => principals.id),
+  email: text('email').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
+export const sessions = sqliteTable('sessions', {
+  tokenHash: text('token_hash').primaryKey(),
+  principalId: text('principal_id').notNull().references(() => principals.id),
+  createdAt: text('created_at').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  revokedAt: text('revoked_at'),
+});
+
+export const roomMembers = sqliteTable('room_members', {
+  roomId: text('room_id').notNull().references(() => rooms.id),
+  principalId: text('principal_id').notNull().references(() => principals.id),
+  role: text('role').$type<'owner' | 'member'>().notNull(),
+});
+
 export const tasks = sqliteTable('tasks', {
   id: text('id').primaryKey(),
   roomId: text('room_id').notNull().default('default').references(() => rooms.id),
   title: text('title').notNull(),
   owner: text('owner').notNull(),
+  ownerPrincipalId: text('owner_principal_id').references(() => principals.id),
   agentId: text('agent_id'),
   definitionOfDone: text('definition_of_done').notNull(),
   status: text('status').$type<TaskStatus>().notNull(),
@@ -21,12 +51,15 @@ export const tasks = sqliteTable('tasks', {
   question: text('question'),
   answer: text('answer'),
   answeredBy: text('answered_by'),
+  answeredByPrincipalId: text('answered_by_principal_id').references(() => principals.id),
   verdict: text('verdict').$type<TaskVerdict>(),
   verdictNote: text('verdict_note'),
   verdictBy: text('verdict_by'),
+  verdictByPrincipalId: text('verdict_by_principal_id').references(() => principals.id),
   proposal: text('proposal', { mode: 'json' }).$type<TaskProposal>(),
   proposalChoice: text('proposal_choice'),
   proposalBy: text('proposal_by'),
+  proposalByPrincipalId: text('proposal_by_principal_id').references(() => principals.id),
   parentTaskId: text('parent_task_id'),
 });
 export const events = sqliteTable('events', {
@@ -41,6 +74,7 @@ export const messages = sqliteTable('messages', {
   id: text('id').primaryKey(),
   roomId: text('room_id').notNull().references(() => rooms.id),
   author: text('author').notNull(),
+  authorPrincipalId: text('author_principal_id').references(() => principals.id),
   body: text('body', { mode: 'json' }).$type<MessageBody>().notNull(),
   createdAt: text('created_at').notNull(),
 });

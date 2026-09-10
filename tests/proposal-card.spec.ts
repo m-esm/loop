@@ -5,9 +5,12 @@ import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { once } from 'node:events';
 import type { Message, Task } from '@loop/types';
+import { authedContext, seedSession, withAuth } from './auth';
 
-test('proposal card approves, discusses, and rejects', async ({ browser, request }) => {
+test('proposal card approves, discusses, and rejects', async ({ browser, request: raw }) => {
   const dir = mkdtempSync(join(tmpdir(), 'loop-propose-'));
+  const session = seedSession(join(dir, 'loop.sqlite'));
+  const request = withAuth(raw, session.token);
   const payload = {
     question: 'Which store?',
     options: ['SQLite', 'Postgres'],
@@ -60,13 +63,12 @@ test('proposal card approves, discusses, and rejects', async ({ browser, request
   }
   try {
     await startApi();
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const context = await authedContext(browser, session.token);
     contexts.push(context);
     const page = await context.newPage();
     await page.goto('http://127.0.0.1:3100');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
 
-    await page.getByLabel('Author', { exact: true }).fill('Moshe');
     await page.getByLabel('Message', { exact: true }).fill('/task Pick a store :: proof');
     const postedStore = page.waitForResponse((response) => response.url().endsWith('/messages') && response.request().method() === 'POST');
     await page.getByLabel('Message', { exact: true }).press('Enter');
