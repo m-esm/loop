@@ -4,8 +4,7 @@ import { useRef, useState, type FormEvent } from 'react';
 import { parseComposer } from '@loop/types';
 import { api } from '../lib/api';
 
-export default function Composer() {
-  const [author, setAuthor] = useState('Human');
+export default function Composer({ author, onAuthorChange }: { author: string; onAuthorChange: (value: string) => void }) {
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
   const sending = useRef(false);
@@ -26,7 +25,7 @@ export default function Composer() {
     finally { sending.current = false; setBusy(false); }
   }
   return <form className="composer" onSubmit={send}>
-    <label>Author<input value={author} onChange={(event) => setAuthor(event.target.value)} maxLength={100} required disabled={busy} /></label>
+    <label>Author<input value={author} onChange={(event) => onAuthorChange(event.target.value)} maxLength={100} required disabled={busy} /></label>
     <label className="wide" htmlFor="room-message">Message</label>
     <textarea className="wide" id="room-message" value={body} onChange={(event) => setBody(event.target.value)} rows={3} maxLength={8000} disabled={busy}
       onKeyDown={(event) => {

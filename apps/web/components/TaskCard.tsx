@@ -4,7 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { chipClass, isActiveStatus, type Task } from '@loop/types';
 import { api } from '../lib/api';
 
-export default function TaskCard({ task }: { task: Task }) {
+export default function TaskCard({ task, author }: { task: Task; author: string }) {
   const terminal = !isActiveStatus(task.status);
   const waiting = task.status === 'needs_input' && !!task.question;
   const [answer, setAnswer] = useState('');
@@ -17,7 +17,7 @@ export default function TaskCard({ task }: { task: Task }) {
     try {
       await api(`/tasks/${task.id}/answer`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answer, answeredBy: 'Human' }),
+        body: JSON.stringify({ answer, answeredBy: author }),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Answer could not be sent.');
