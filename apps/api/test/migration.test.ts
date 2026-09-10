@@ -19,5 +19,17 @@ test('room migration preserves legacy task events and their replay ids', () => {
     assert.deepEqual(JSON.parse(event.payload), { task: { ...task, roomId: 'default' } });
     assert.deepEqual(sqlite.prepare('SELECT id FROM rooms').all(), [{ id: 'default' }]);
     assert.deepEqual(sqlite.pragma('foreign_key_check'), []);
+    sqlite.exec(readFileSync('migrations/0002_task_run.sql', 'utf8'));
+    const columns = sqlite.prepare('PRAGMA table_info(tasks)').all() as { name: string }[];
+    assert.deepEqual(
+      columns.map((column) => column.name).filter((name) => ['claimed_by', 'run_id', 'log', 'result', 'error'].includes(name)),
+      ['claimed_by', 'run_id', 'log', 'result', 'error'],
+    );
+    const migrated = sqlite.prepare('SELECT claimed_by, run_id, log, result, error FROM tasks WHERE id = ?').get(task.id) as {
+      claimed_by: null; run_id: null; log: string; result: null; error: null;
+    };
+    assert.equal(migrated.log, '[]');
+    assert.equal(migrated.claimed_by, null);
+    assert.deepEqual(sqlite.pragma('foreign_key_check'), []);
   } finally { sqlite.close(); }
 });

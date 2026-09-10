@@ -1,6 +1,7 @@
 import { createApp } from './app';
 
 async function main() {
+  process.env.LOOP_RUNNER ??= '1';
   const app = await createApp();
   app.enableShutdownHooks();
   const port = Number(process.env.PORT ?? 3001);

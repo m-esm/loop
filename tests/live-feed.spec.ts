@@ -15,7 +15,7 @@ test('two tabs receive creates and status changes, then reconnect and replay aft
   async function startApi() {
     api = spawn(process.execPath, ['dist/src/main.js'], {
       cwd: resolve('apps/api'),
-      env: { ...process.env, PORT: '3101', WEB_ORIGIN: 'http://127.0.0.1:3100', DATABASE_PATH: join(dir, 'loop.sqlite') },
+      env: { ...process.env, PORT: '3101', WEB_ORIGIN: 'http://127.0.0.1:3100', DATABASE_PATH: join(dir, 'loop.sqlite'), LOOP_RUNNER: '0' },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     api.stdout?.on('data', (chunk) => { output += chunk; });

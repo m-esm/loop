@@ -19,11 +19,17 @@ export interface Task extends CreateTask {
   status: TaskStatus;
   createdAt: string;
   updatedAt: string;
+  claimedBy: string | null;
+  runId: string | null;
+  log: string[];
+  result: string | null;
+  error: string | null;
 }
 export interface TaskEventPayloads {
   message_created: { message: Message };
   task_created: { task: Task };
   task_status_changed: { task: Task; previousStatus: TaskStatus };
+  task_progress: { task: Task };
 }
 export type EventKind = keyof TaskEventPayloads;
 export type TaskEvent = {

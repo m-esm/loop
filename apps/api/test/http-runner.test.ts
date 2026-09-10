@@ -1,0 +1,77 @@
+import { after, before, test } from 'node:test';
+import assert from 'node:assert/strict';
+import type { INestApplication } from '@nestjs/common';
+import type { Message, MessageSnapshot, Task, TaskEvent } from '@loop/types';
+import { createApp } from '../src/app';
+import { EventBus } from '../src/bus';
+
+let app: INestApplication;
+let url: string;
+const previous = process.env.LOOP_RUNNER;
+
+before(async () => {
+  process.env.DATABASE_PATH = ':memory:';
+  process.env.LOOP_RUNNER = '1';
+  app = await createApp(false);
+  await app.listen(0, '127.0.0.1');
+  url = `${await app.getUrl()}/api`;
+});
+after(async () => {
+  if (previous === undefined) delete process.env.LOOP_RUNNER;
+  else process.env.LOOP_RUNNER = previous;
+  await app.close();
+});
+
+async function postTask(body: string) {
+  const response = await fetch(`${url}/messages`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ roomId: 'default', author: 'Human', body }),
+  });
+  assert.equal(response.status, 201);
+  const message = await response.json() as Message;
+  assert.equal(message.body.kind, 'task');
+  if (message.body.kind !== 'task') throw new Error('expected task');
+  return message.body.taskId;
+}
+
+async function waitTask(id: string, status: Task['status'], ms = 5000) {
+  const start = Date.now();
+  let task: Task | undefined;
+  while (Date.now() - start < ms) {
+    const response = await fetch(`${url}/tasks/${id}`);
+    assert.equal(response.status, 200);
+    task = await response.json() as Task;
+    if (task.status === status) return task;
+    await new Promise((resolve) => setTimeout(resolve, 40));
+  }
+  assert.equal(task?.status, status);
+  return task!;
+}
+
+test('LOOP_RUNNER finishes /task without PATCH and fails FAIL: titles', async () => {
+  const echoId = await postTask('/task Echo me :: proof');
+  const echo = await waitTask(echoId, 'done');
+  assert.equal(echo.result, 'Echo: Echo me');
+  assert.equal(echo.error, null);
+  assert.ok(echo.log.includes('Echo started'));
+  assert.ok(echo.log.includes('Echo finished'));
+  const failId = await postTask('/task FAIL: boom :: x');
+  const failed = await waitTask(failId, 'failed');
+  assert.equal(failed.error, 'boom');
+  const snapshot = await (await fetch(`${url}/messages?roomId=default`)).json() as MessageSnapshot;
+  assert.equal(snapshot.messages.length, 2);
+  const replay = app.get(EventBus).since(0) as TaskEvent[];
+  let folded: Task | undefined;
+  let seenDone = false;
+  for (const event of replay) {
+    if (event.kind === 'message_created') continue;
+    const row = event.payload.task;
+    if (row.id !== echoId) continue;
+    if (seenDone && row.status === 'running') assert.fail('done then running');
+    if (row.status === 'done') seenDone = true;
+    folded = row;
+  }
+  assert.equal(folded?.status, echo.status);
+  assert.deepEqual(folded?.log, echo.log);
+  assert.equal(folded?.result, echo.result);
+});

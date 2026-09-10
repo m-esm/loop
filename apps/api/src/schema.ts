@@ -12,6 +12,11 @@ export const tasks = sqliteTable('tasks', {
   status: text('status').$type<TaskStatus>().notNull(),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
+  claimedBy: text('claimed_by'),
+  runId: text('run_id'),
+  log: text('log', { mode: 'json' }).$type<string[]>().notNull().$defaultFn(() => []),
+  result: text('result'),
+  error: text('error'),
 });
 export const events = sqliteTable('events', {
   id: integer('id').primaryKey({ autoIncrement: true }),

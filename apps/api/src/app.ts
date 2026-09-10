@@ -8,8 +8,9 @@ import { TasksController } from './tasks.controller';
 import { StreamController } from './stream.controller';
 import { MessageStore } from './message-store';
 import { MessagesController } from './messages.controller';
+import { TaskRunner } from './runner';
 
-@Module({ providers: [Database, EventBus, TaskStore, MessageStore], controllers: [TasksController, StreamController, MessagesController] })
+@Module({ providers: [Database, EventBus, TaskStore, MessageStore, TaskRunner], controllers: [TasksController, StreamController, MessagesController] })
 class AppModule {}
 
 export async function createApp(logger: false | undefined = undefined) {
