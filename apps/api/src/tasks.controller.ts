@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Inject, Param, Patch, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpCode, Inject, Param, Patch, Post } from '@nestjs/common';
 import { isTaskStatus } from '@loop/types';
 import { TaskStore } from './task-store';
 import { field } from './field';
@@ -18,5 +18,8 @@ export class TasksController {
     const status = body && typeof body === 'object' ? (body as Record<string, unknown>).status : undefined;
     if (!isTaskStatus(status)) throw new BadRequestException('Invalid task status');
     return this.store.updateStatus(id, status);
+  }
+  @Post(':id/answer') @HttpCode(200) answer(@Param('id') id: string, @Body() body: unknown) {
+    return this.store.answer(id, field(body, 'answer', 8000), field(body, 'answeredBy', 100));
   }
 }

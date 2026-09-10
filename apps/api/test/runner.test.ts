@@ -108,6 +108,34 @@ test('reclaim on a new API process against the same file emits runner lost', () 
   assert.equal(added[0].kind, 'task_status_changed');
 });
 
+test('ASK: parks in needs_input, resumes after answer, and finishes with the answer', async () => {
+  const task = store.create({ ...input, title: 'ASK: what colour' });
+  runner.start();
+  await waitFor(() => store.get(task.id).status === 'needs_input');
+  const parked = store.get(task.id);
+  assert.equal(parked.question, 'what colour');
+  assert.equal(parked.result, null);
+  store.answer(task.id, 'blue', 'Moshe');
+  await waitFor(() => store.get(task.id).status === 'done');
+  const done = store.get(task.id);
+  assert.equal(done.result, 'Answered: blue');
+  assert.equal(done.answer, 'blue');
+  assert.equal(done.answeredBy, 'Moshe');
+});
+
+test('needs_input survives reclaimLost as waiting on a human', () => {
+  const task = store.create(input);
+  const claimed = store.claim(task.id, 'echo')!;
+  store.ask(claimed.id, claimed.runId!, 'what colour');
+  const before = bus.latestId();
+  const reclaimed = store.reclaimLost();
+  assert.equal(reclaimed.length, 0);
+  const parked = store.get(task.id);
+  assert.equal(parked.status, 'needs_input');
+  assert.equal(parked.question, 'what colour');
+  assert.equal(bus.latestId(), before);
+});
+
 test('claim is deferred so a /task message stays task_created then message_created', async () => {
   const messages = new MessageStore(database, bus, store);
   const kinds: string[] = [];

@@ -55,6 +55,27 @@ test('PATCH /tasks/:id/status validates status and persists a change', async () 
   assert.equal((await patch('missing', status)).status, 404);
 });
 
+test('POST /tasks/:id/answer validates fields and only accepts needs_input', async () => {
+  const task = await create();
+  const answer = (id: string, body: unknown) => fetch(`${url}/tasks/${id}/answer`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  assert.equal((await answer(task.id, { answer: 'blue', answeredBy: 'Moshe' })).status, 400);
+  assert.equal((await fetch(`${url}/tasks/${task.id}/status`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'needs_input' }),
+  })).status, 200);
+  const ok = await answer(task.id, { answer: 'blue', answeredBy: 'Moshe' });
+  assert.equal(ok.status, 200);
+  const body = await ok.json() as Task;
+  assert.equal(body.status, INITIAL_STATUS);
+  assert.equal(body.answer, 'blue');
+  assert.equal(body.answeredBy, 'Moshe');
+  assert.equal((await answer(task.id, { answer: 'green', answeredBy: 'Moshe' })).status, 400);
+  assert.equal((await answer(task.id, { answer: ' ', answeredBy: 'Moshe' })).status, 400);
+  assert.equal((await answer(task.id, { answer: 'blue', answeredBy: 'a'.repeat(101) })).status, 400);
+  assert.equal((await answer('missing', { answer: 'blue', answeredBy: 'Moshe' })).status, 404);
+});
+
 test('GET /stream replays across database pages in order, then streams live with SSE headers', async () => {
   const snapshot = await (await fetch(`${url}/tasks`)).json() as TaskSnapshot;
   const count = 555;

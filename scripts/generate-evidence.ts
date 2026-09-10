@@ -156,12 +156,12 @@ function generate(): string {
     }
   }
 
-  const migrations = gitLines(['ls-files', '-z', 'apps/api/migrations/*.sql']);
+  const migrations = gitLines(['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'apps/api/migrations/*.sql']);
   const screenshots = gitLines(['ls-files', '-z', 'docs/screenshots']).map((path) => `${path} ${pngSize(path)}`);
   const insertHits: string[] = [];
   walkTs('apps', insertHits);
   walkTs('packages', insertHits);
-  const specFiles = gitLines(['ls-files', '-z', 'tests/*.spec.ts']);
+  const specFiles = gitLines(['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'tests/*.spec.ts']);
   const specs = specFiles.map((file) => ({ file, titles: specTitles(file) }));
 
   const lint = runNpm(['run', 'lint'], { LOOP_EVIDENCE_INNER: '1' });
@@ -250,9 +250,10 @@ function generate(): string {
     '## Tree notes',
     '',
     'The echo runner lives in the API and claims queued tasks when `LOOP_RUNNER=1`.',
-    'It finishes with `Echo: <title>` or fails titles that start with `FAIL:`.',
-    'Claim, progress, and finish go through the task store; the bus remains the single `insert(events)` path.',
+    'It finishes with `Echo: <title>`, fails titles that start with `FAIL:`, and parks `ASK:` titles in `needs_input` until a human answers.',
+    'Claim, progress, finish, ask, and answer go through the task store; the bus remains the single `insert(events)` path.',
     'Migration `0002_task_run.sql` adds `claimed_by`, `run_id`, `log`, `result`, and `error`.',
+    'Migration `0003_task_question.sql` adds `question`, `answer`, and `answered_by`.',
     '',
   ];
 

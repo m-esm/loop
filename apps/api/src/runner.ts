@@ -54,7 +54,7 @@ export class TaskRunner implements OnModuleInit, OnModuleDestroy {
     this.stopped = false;
     this.store.reclaimLost();
     this.unsubscribe = this.bus.subscribe((event) => {
-      if (event.kind === 'task_created') this.wake();
+      if (event.kind === 'task_created' || event.kind === 'task_status_changed') this.wake();
     });
     this.timer = setInterval(() => this.wake(), 1000);
     this.wake();
@@ -99,6 +99,15 @@ export class TaskRunner implements OnModuleInit, OnModuleDestroy {
       lastProgress = Date.now();
     };
     try {
+      if (title.startsWith('ASK:')) {
+        const current = this.store.get(id);
+        if (current.answer) {
+          this.store.finish(id, runId, { status: 'done', result: `Answered: ${current.answer}` });
+        } else {
+          this.store.ask(id, runId, title.slice(4).trim() || title);
+        }
+        return;
+      }
       for (const line of lines) {
         if (this.stopped) throw new Error('timed out');
         pending.push(line);

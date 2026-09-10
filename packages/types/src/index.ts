@@ -24,6 +24,9 @@ export interface Task extends CreateTask {
   log: string[];
   result: string | null;
   error: string | null;
+  question: string | null;
+  answer: string | null;
+  answeredBy: string | null;
 }
 export interface TaskEventPayloads {
   message_created: { message: Message };

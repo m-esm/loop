@@ -120,6 +120,51 @@ test('fifty log appends compact to one task_progress row and stay within caps', 
   assert.equal(recount.n, 1);
 });
 
+test('ask fences on a stale run_id and emits no event', () => {
+  const task = store.create(input);
+  const claimed = store.claim(task.id, 'echo')!;
+  const before = bus.latestId();
+  assert.throws(() => store.ask(task.id, 'other-run', 'what colour'));
+  assert.equal(bus.latestId(), before);
+  assert.equal(store.get(task.id).status, 'running');
+  const asked = store.ask(claimed.id, claimed.runId!, 'what colour');
+  assert.equal(asked.status, 'needs_input');
+  assert.equal(asked.question, 'what colour');
+  const added = bus.since(before);
+  assert.deepEqual(added.map((event) => event.kind), ['task_status_changed']);
+  if (added[0].kind !== 'task_status_changed') throw new Error('expected status change');
+  assert.equal(added[0].payload.previousStatus, 'running');
+  assert.equal(added[0].payload.task.status, 'needs_input');
+});
+
+test('answer on a task not in needs_input is rejected and writes nothing', () => {
+  const task = store.create(input);
+  const before = bus.latestId();
+  assert.throws(() => store.answer(task.id, 'blue', 'Human'), /not waiting for an answer/);
+  assert.equal(bus.latestId(), before);
+  assert.equal(store.get(task.id).status, INITIAL_STATUS);
+  assert.throws(() => store.answer('missing', 'blue', 'Human'), /Task not found/);
+});
+
+test('answer flips needs_input to queued and preserves the answer', () => {
+  const task = store.create(input);
+  const claimed = store.claim(task.id, 'echo')!;
+  store.ask(claimed.id, claimed.runId!, 'what colour');
+  const before = bus.latestId();
+  const answered = store.answer(task.id, 'blue', 'Moshe');
+  assert.equal(answered.status, INITIAL_STATUS);
+  assert.equal(answered.answer, 'blue');
+  assert.equal(answered.answeredBy, 'Moshe');
+  assert.equal(answered.question, 'what colour');
+  const added = bus.since(before);
+  assert.deepEqual(added.map((event) => event.kind), ['task_status_changed']);
+  if (added[0].kind !== 'task_status_changed') throw new Error('expected status change');
+  assert.equal(added[0].payload.previousStatus, 'needs_input');
+  assert.throws(() => store.answer(task.id, 'green', 'Moshe'), /not waiting for an answer/);
+  assert.equal(bus.latestId(), before + 1);
+  assert.equal(store.get(task.id).answer, 'blue');
+});
+
 test('replay of since=0 matches GET task and never goes done then running', () => {
   const task = store.create(input);
   const claimed = store.claim(task.id, 'echo')!;
