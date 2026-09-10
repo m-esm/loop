@@ -20,6 +20,8 @@ test('a /task finishes with stdout no one hardcoded', async ({ browser, request 
   let output = '';
   const contexts: BrowserContext[] = [];
   const apiUrl = 'http://127.0.0.1:3101/api';
+  // This spec starts its API once against a fresh database.
+  const expectedTasks = () => 0;
   async function startApi() {
     api = spawn(process.execPath, ['dist/src/main.js'], {
       cwd: resolve('apps/api'),
@@ -35,9 +37,16 @@ test('a /task finishes with stdout no one hardcoded', async ({ browser, request 
     });
     api.stdout?.on('data', (chunk) => { output += chunk; });
     api.stderr?.on('data', (chunk) => { output += chunk; });
+    // A 200 only proves something answers on 3101. Every spec uses that port, so
+    // a leftover server from an earlier spec passes this poll and then serves
+    // this spec's requests against the wrong database and config. Require a task
+    // list this spec's own fresh database is the only one that can return.
     await expect.poll(async () => {
       if (api?.exitCode != null) throw new Error(output);
-      return request.get(`${apiUrl}/tasks`).then((response) => response.status()).catch(() => 0);
+      return request.get(`${apiUrl}/tasks`)
+        .then(async (response) => (response.status() === 200
+          && ((await response.json()) as { tasks: unknown[] }).tasks.length === expectedTasks() ? 200 : 0))
+        .catch(() => 0);
     }).toBe(200);
   }
   async function stopApi() {

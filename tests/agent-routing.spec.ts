@@ -28,6 +28,8 @@ test('two /task posts route to two different agent commands', async ({ browser, 
   let output = '';
   const contexts: BrowserContext[] = [];
   const apiUrl = 'http://127.0.0.1:3101/api';
+  // This spec starts its API once against a fresh database.
+  const expectedTasks = () => 0;
   async function startApi() {
     api = spawn(process.execPath, ['dist/src/main.js'], {
       cwd: resolve('apps/api'),
@@ -45,13 +47,13 @@ test('two /task posts route to two different agent commands', async ({ browser, 
     api.stderr?.on('data', (chunk) => { output += chunk; });
     await expect.poll(async () => {
       if (api?.exitCode != null) throw new Error(output);
-      // A 200 only proves something answers on this port. Every spec uses 3101,
-      // so a leftover server from an earlier spec would pass this poll and then
-      // serve requests without this spec's agents.json. Require an empty task
-      // list, which only this spec's fresh database can give.
+      // A 200 only proves something answers on 3101. Every spec uses that port, so
+      // a leftover server from an earlier spec passes this poll and then serves
+      // this spec's requests against the wrong database and config. Require a task
+      // list this spec's own fresh database is the only one that can return.
       return request.get(`${apiUrl}/tasks`)
         .then(async (response) => (response.status() === 200
-          && ((await response.json()) as { tasks: unknown[] }).tasks.length === 0 ? 200 : 0))
+          && ((await response.json()) as { tasks: unknown[] }).tasks.length === expectedTasks() ? 200 : 0))
         .catch(() => 0);
     }).toBe(200);
   }
