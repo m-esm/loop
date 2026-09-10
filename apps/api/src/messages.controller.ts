@@ -12,6 +12,7 @@ export class MessagesController {
   ) {}
 
   private inRoom(req: Request, room: string) {
+    this.auth.assertRoom(room);
     if (!this.auth.roomIds(actor(req).id).includes(room)) {
       throw new ForbiddenException('Not a member of this room');
     }

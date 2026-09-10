@@ -15,6 +15,15 @@ export function optionalField(body: unknown, key: string, limit: number): string
 }
 
 export function roomId(value: unknown): string {
-  if (value !== 'default') throw new BadRequestException('Unknown room');
+  if (typeof value !== 'string' || !/^[A-Za-z0-9_-]+$/.test(value) || value.length > 100) {
+    throw new BadRequestException('Unknown room');
+  }
+  return value;
+}
+
+export function mentionName(value: string): string {
+  if (!/^[A-Za-z0-9_-]+$/.test(value)) {
+    throw new BadRequestException('name must be letters, digits, hyphen, or underscore');
+  }
   return value;
 }

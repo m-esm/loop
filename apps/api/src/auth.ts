@@ -11,7 +11,7 @@ import {
 } from './auth-crypto';
 import { Database } from './database';
 import { syncAgentPrincipals } from './principals';
-import { credentials, principals, roomMembers, sessions } from './schema';
+import { credentials, principals, roomMembers, rooms, sessions } from './schema';
 
 export type Principal = {
   id: string;
@@ -60,6 +60,31 @@ export class AuthService implements OnModuleInit {
   roomIds(principalId: string): string[] {
     return this.database.db.select({ roomId: roomMembers.roomId }).from(roomMembers)
       .where(eq(roomMembers.principalId, principalId)).all().map((row) => row.roomId);
+  }
+
+  /**
+   * An unknown room is a bad request, not a 404: `roomId` arrives in the body
+   * beside the other fields, so it is validated like them. Membership on a real
+   * room is the separate, forbidden-shaped question below.
+   */
+  assertRoom(room: string) {
+    const row = this.database.db.select({ id: rooms.id }).from(rooms)
+      .where(eq(rooms.id, room)).get();
+    if (!row) throw new BadRequestException('roomId must be an existing room');
+  }
+
+  membership(principalId: string, room: string): { role: 'owner' | 'member' } {
+    this.assertRoom(room);
+    const row = this.database.db.select({ role: roomMembers.role }).from(roomMembers)
+      .where(and(eq(roomMembers.principalId, principalId), eq(roomMembers.roomId, room))).get();
+    if (!row) throw new ForbiddenException('Not a member of this room');
+    return { role: row.role as 'owner' | 'member' };
+  }
+
+  /** Membership is not ownership. Registering an agent runs code, so it is administration. */
+  requireOwner(principalId: string, room: string) {
+    const { role } = this.membership(principalId, room);
+    if (role !== 'owner') throw new ForbiddenException('Only a room owner can do this');
   }
 
   me(principalId: string): Principal {

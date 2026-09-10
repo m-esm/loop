@@ -7,6 +7,7 @@ import { EventBus } from './bus';
 import { TaskStore } from './task-store';
 import { messages } from './schema';
 import { roomId } from './field';
+import { assertKnownRoom } from './room-agents';
 
 @Injectable()
 export class MessageStore {
@@ -18,6 +19,7 @@ export class MessageStore {
 
   list(room: string): MessageSnapshot {
     roomId(room);
+    assertKnownRoom(this.database, room);
     return this.database.sqlite.transaction(() => ({
       messages: this.database.db.select().from(messages).where(eq(messages.roomId, room))
         .orderBy(asc(sql`rowid`)).all(),
@@ -27,6 +29,7 @@ export class MessageStore {
 
   create(input: CreateMessage) {
     roomId(input.roomId);
+    assertKnownRoom(this.database, input.roomId);
     const parsed = parseComposer(input.body);
     if (parsed.kind === 'error') throw new BadRequestException(parsed.message);
     // Commit and publish the task first. Both calls are synchronous, so replay
@@ -53,6 +56,7 @@ export class MessageStore {
   /** Card for an already-created task, so a spawned child shows in the transcript. */
   attachTask(room: string, author: string, taskId: string, authorPrincipalId?: string | null) {
     roomId(room);
+    assertKnownRoom(this.database, room);
     this.tasks.get(taskId);
     const event = this.bus.emitEvent(() => {
       const ts = new Date().toISOString();

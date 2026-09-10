@@ -6,6 +6,7 @@ import { setImmediate as defer, setInterval, setTimeout, clearInterval, clearTim
 import type { Readable } from 'node:stream';
 import { INITIAL_STATUS, parseTaskProposal, parseTaskSpawn, type Task } from '@loop/types';
 import { loadAgents, type AgentConfig } from './agents';
+import { listRoomAgents, syncCatalogRoomAgents } from './room-agents';
 import { EventBus } from './bus';
 import { MessageStore } from './message-store';
 import { syncAgentPrincipals } from './principals';
@@ -76,6 +77,9 @@ export class TaskRunner implements OnModuleInit, OnModuleDestroy {
     this.started = true;
     this.stopped = false;
     syncAgentPrincipals(this.store.database, this.agents);
+    // A custom agents.json still needs a mention in the default room, or a task
+    // there resolves nothing and every run fails with "no agents".
+    syncCatalogRoomAgents(this.store.database, this.agents);
     this.store.reclaimLost();
     this.unsubscribe = this.bus.subscribe((event) => {
       if (event.kind === 'task_created' || event.kind === 'task_status_changed') this.wake();
@@ -103,21 +107,47 @@ export class TaskRunner implements OnModuleInit, OnModuleDestroy {
     if (this.busy || this.stopped) return;
     const next = this.store.list().tasks.filter((task) => task.status === INITIAL_STATUS).at(-1);
     if (!next) return;
-    const fallback = this.agents[0];
-    if (!next.agentId && !fallback) return;
-    const resolvedId = next.agentId ?? fallback.id;
-    const agent = this.agents.find((item) => item.id === resolvedId);
-    const claimed = this.store.claim(next.id, resolvedId);
+    const resolved = this.resolveAgent(next);
+    const claimed = this.store.claim(next.id, resolved.claimedAs);
     if (!claimed?.runId) return;
-    if (!agent) {
-      const known = this.agents.map((item) => item.id).join(', ') || '(none)';
-      this.store.finish(claimed.id, claimed.runId, {
-        status: 'failed',
-        error: `Unknown agent ${resolvedId}. Known: ${known}`,
-      });
+    if ('error' in resolved) {
+      this.store.finish(claimed.id, claimed.runId, { status: 'failed', error: resolved.error });
       this.wake();
       return;
     }
+    this.startClaimed(claimed, resolved.agent);
+  }
+
+  /**
+   * Agents are per room now. A task names the room's display name, which maps to a
+   * catalog id; the catalog holds the command. There is no `agents[0]` default: a
+   * task in a room with no agents fails loudly rather than running a stranger's
+   * command that the room never registered.
+   */
+  private resolveAgent(task: Task): { agent: AgentConfig; claimedAs: string } | { error: string; claimedAs: string } {
+    const rows = listRoomAgents(this.store.database, task.roomId);
+    const known = this.agents.map((item) => item.id).join(', ') || '(none)';
+    if (task.agentId) {
+      const row = rows.find((item) => item.name === task.agentId);
+      if (!row) {
+        return { error: `Unknown agent ${task.agentId}. Known: ${known}`, claimedAs: task.agentId };
+      }
+      const agent = this.agents.find((item) => item.id === row.catalogId);
+      if (!agent) {
+        return { error: `Unknown agent ${row.catalogId}. Known: ${known}`, claimedAs: row.catalogId };
+      }
+      return { agent, claimedAs: row.catalogId };
+    }
+    const first = rows
+      .map((row) => ({ row, agent: this.agents.find((item) => item.id === row.catalogId) }))
+      .find((pair) => pair.agent);
+    if (!first?.agent) {
+      return { error: 'This room has no agents.', claimedAs: '(none)' };
+    }
+    return { agent: first.agent, claimedAs: first.row.catalogId };
+  }
+
+  private startClaimed(claimed: Task, agent: AgentConfig) {
     this.busy = true;
     defer(() => { void this.execute(claimed, agent); });
   }

@@ -10,6 +10,7 @@ import Transcript from './Transcript';
 import Composer from './Composer';
 import LoginForm from './LoginForm';
 import ProjectsRailEntry from './ProjectsRailEntry';
+import RoomAgents from './RoomAgents';
 
 export default function Room() {
   const [me, setMe] = useState<Me | null>(null);
@@ -69,6 +70,7 @@ export default function Room() {
   return <>
     {/* Room owns the feed; portal the rail entry so page.tsx stays a server shell. */}
     <ProjectsRailEntry count={needsHumanCount(state.tasks)} />
+    <RoomAgents room="default" />
     <nav aria-label="Room views">
       <span className="room-tab">
         <button aria-pressed={view === 'chat'} onClick={() => setView('chat')}>Chat</button>

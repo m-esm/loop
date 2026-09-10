@@ -32,6 +32,15 @@ export const roomMembers = sqliteTable('room_members', {
   role: text('role').$type<'owner' | 'member'>().notNull(),
 });
 
+export const roomAgents = sqliteTable('room_agents', {
+  id: text('id').primaryKey(),
+  roomId: text('room_id').notNull().references(() => rooms.id),
+  catalogId: text('catalog_id').notNull(),
+  name: text('name').notNull(),
+  createdBy: text('created_by').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
 export const tasks = sqliteTable('tasks', {
   id: text('id').primaryKey(),
   roomId: text('room_id').notNull().default('default').references(() => rooms.id),

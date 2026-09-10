@@ -5,6 +5,23 @@ export * from './composer';
 export * from './proposal';
 export * from './spawn';
 
+export interface RoomAgent {
+  id: string;
+  roomId: string;
+  catalogId: string;
+  name: string;
+  createdBy: string;
+  createdAt: string;
+}
+export interface CatalogAgent {
+  id: string;
+  name: string;
+}
+export interface RoomAgentsSnapshot {
+  agents: RoomAgent[];
+  catalog: CatalogAgent[];
+  role: 'owner' | 'member';
+}
 export type MessageBody = { kind: 'text'; text: string } | { kind: 'task'; taskId: string };
 export interface Message {
   id: string;
