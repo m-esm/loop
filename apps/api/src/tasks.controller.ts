@@ -1,14 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Inject, Param, Patch, Post } from '@nestjs/common';
 import { isTaskStatus } from '@loop/types';
 import { TaskStore } from './task-store';
-
-function field(body: unknown, key: string, limit: number): string {
-  const value = body && typeof body === 'object' ? (body as Record<string, unknown>)[key] : undefined;
-  if (typeof value !== 'string' || !value.trim() || value.length > limit) {
-    throw new BadRequestException(`${key} must be nonempty text of at most ${limit} characters`);
-  }
-  return value.trim();
-}
+import { field } from './field';
 
 @Controller('tasks')
 export class TasksController {

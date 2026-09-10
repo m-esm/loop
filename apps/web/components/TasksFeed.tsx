@@ -52,7 +52,11 @@ export default function TasksFeed({ since, onEvent }: {
         try {
           const event = JSON.parse(message.data) as TaskEvent;
           if (!Number.isSafeInteger(event.id) || event.id <= lastId || seen.has(event.id)) return;
-          if (!event.payload?.task?.id) return;
+          if (event.kind === 'message_created') {
+            if (!event.payload?.message?.id) return;
+          } else if (event.kind === 'task_created' || event.kind === 'task_status_changed') {
+            if (!event.payload?.task?.id) return;
+          } else return;
           onEventRef.current(event);
           if (seen.size > 4000) seen = new Set();
           seen.add(event.id);

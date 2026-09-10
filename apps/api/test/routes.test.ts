@@ -92,7 +92,7 @@ test('GET /stream replays across database pages in order, then streams live with
     assert.equal(new Set(received.map((event) => event.id)).size, count);
     const task = await create();
     await readUntil(count + 1);
-    assert.equal(received.at(-1)!.task_id, task.id);
+    assert.equal(received.at(-1)!.subject_id, task.id);
   } finally { controller.abort(); await reader.cancel().catch(() => {}); }
 });
 
