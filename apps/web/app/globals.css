@@ -12,6 +12,9 @@ main { padding: 28px 32px; min-width: 0; display: flex; flex-direction: column; 
 main > section[aria-label="Chat"] { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { font-size: 24px; }
+/* The rail wordmark is not a heading: the room's h1 already names the project,
+   and two "Loop" headings read as two landmarks to a screen reader. */
+.brand { font-size: 24px; font-weight: 600; margin-bottom: 4px; }
 h2 { font-size: 22px; }
 .context h2 { font-size: 17px; }
 .muted { color: #616975; font-size: 14px; }
