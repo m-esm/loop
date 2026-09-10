@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { MessageSnapshot, TaskSnapshot } from '@loop/types';
+import { isActiveStatus, type MessageSnapshot, type TaskSnapshot } from '@loop/types';
 import { api } from '../lib/api';
 import { applyTaskEvent, needsHumanCount, type RoomFeed } from '../lib/feed';
 import TasksFeed from './TasksFeed';
@@ -17,6 +17,10 @@ export default function Room() {
   const [author, setAuthor] = useState('Human');
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const chatCount = needsHumanCount(state.tasks);
+  const tasksCount = state.tasks.filter((task) => isActiveStatus(task.status)).length;
+  const chatLabel = chatCount === 1 ? '1 task needs a human' : `${chatCount} tasks need a human`;
+  const tasksLabel = tasksCount === 1 ? '1 task running' : `${tasksCount} tasks running`;
   useEffect(() => {
     const controller = new AbortController();
     Promise.all([
@@ -33,8 +37,18 @@ export default function Room() {
     {/* Room owns the feed; portal the rail entry so page.tsx stays a server shell. */}
     <ProjectsRailEntry count={needsHumanCount(state.tasks)} />
     <nav aria-label="Room views">
-      <button aria-pressed={view === 'chat'} onClick={() => setView('chat')}>Chat</button>
-      <button aria-pressed={view === 'tasks'} onClick={() => setView('tasks')}>Tasks</button>
+      <span className="room-tab">
+        <button aria-pressed={view === 'chat'} onClick={() => setView('chat')}>Chat</button>
+        {chatCount > 0
+          ? <span data-tab-badge="chat" className="needs-human-pill" aria-label={chatLabel}>{chatCount}</span>
+          : null}
+      </span>
+      <span className="room-tab">
+        <button aria-pressed={view === 'tasks'} onClick={() => setView('tasks')}>Tasks</button>
+        {tasksCount > 0
+          ? <span data-tab-badge="tasks" className="tab-running-pill" aria-label={tasksLabel}>{tasksCount}</span>
+          : null}
+      </span>
       {cursors && <TasksFeed since={Math.min(cursors.tasks, cursors.messages)} onEvent={(event) => {
         const baseline = event.kind === 'message_created' ? cursors.messages : cursors.tasks;
         if (event.room_id === 'default' && event.id > baseline) setState((rows) => applyTaskEvent(rows, event));
