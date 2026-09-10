@@ -1,16 +1,35 @@
 'use client';
 
-import { useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { Message, Task } from '@loop/types';
 import MessageCard from './MessageCard';
 
 export default function Transcript({ messages, tasks, author }: { messages: Message[]; tasks: Task[]; author: string }) {
   const container = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
+  const pinned = useRef(new Set<string>());
   useLayoutEffect(() => {
     const element = container.current;
     if (element && follow.current) element.scrollTop = element.scrollHeight;
   }, [messages, tasks]);
+  // UI.md: a question is pinned until answered. Following alone is not enough.
+  // An answered card shrinks when its form unmounts, which leaves `follow` stuck
+  // false, so a later parked card never scrolls into view. Re-arm on a new one.
+  useEffect(() => {
+    const waiting = tasks.filter((task) => task.status === 'needs_input').map((task) => task.id);
+    const fresh = waiting.some((id) => !pinned.current.has(id));
+    pinned.current = new Set(waiting);
+    if (!fresh) return;
+    // After paint: the answer form mounts in this same commit, and scrolling to a
+    // height measured before it renders lands short of the form.
+    const frame = requestAnimationFrame(() => {
+      const element = container.current;
+      if (!element) return;
+      follow.current = true;
+      element.scrollTop = element.scrollHeight;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [tasks]);
   const byId = new Map(tasks.map((task) => [task.id, task]));
   return <div className="transcript" ref={container} role="log" aria-label="Room transcript" tabIndex={0}
     onScroll={(event) => {

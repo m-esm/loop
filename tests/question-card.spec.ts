@@ -70,6 +70,10 @@ test('question card answers in the browser and the same task reaches done', asyn
     await expect(colourCard.locator('[data-task-result]')).toHaveText('Answered: blue');
     await expect(shapeCard.locator('.tp-chip')).toHaveText('needs_input');
     await expect(shapeCard).toHaveClass(/question-card/);
+    // A pinned question is useless if you cannot reach its submit button.
+    // toBeInViewport alone passes on a sliver, so assert the whole control.
+    await expect(shapeCard.getByLabel('Answer')).toBeInViewport({ ratio: 1 });
+    await expect(shapeCard.getByRole('button', { name: 'Submit answer', exact: true })).toBeInViewport({ ratio: 1 });
 
     await page.screenshot({ path: resolve('docs/screenshots/room-chat.png') });
   } finally {

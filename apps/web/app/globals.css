@@ -5,7 +5,11 @@ body { margin: 0; }
 aside { padding: 28px 20px; background: #f7f8fa; }
 .projects { border-right: 1px solid #dce0e5; }
 .context { border-left: 1px solid #dce0e5; }
-main { padding: 28px 32px; min-width: 0; }
+main { padding: 28px 32px; min-width: 0; display: flex; flex-direction: column; min-height: 100vh; }
+/* The chat section owns the leftover height so the transcript can never overlap
+   the composer. A hardcoded transcript height guesses the composer's size and
+   clipped the answer form under it. */
+main > section[aria-label="Chat"] { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { font-size: 24px; }
 h2 { font-size: 22px; }
@@ -40,7 +44,7 @@ th, td { padding: 14px 8px; border-bottom: 1px solid #e2e6eb; vertical-align: to
 .task-detail p { white-space: pre-wrap; }
 #task-context:has(.task-detail) > p { display: none; }
 [role="alert"] { color: #963737; }
-.transcript { height: max(240px, calc(100dvh - 490px)); overflow-y: auto; padding: 20px 4px; overflow-anchor: none; }
+.transcript { flex: 1; min-height: 240px; overflow-y: auto; padding: 20px 4px; overflow-anchor: none; }
 .message-card { padding: 14px 16px; margin-bottom: 12px; border: 1px solid #dce0e5; border-radius: 6px; overflow-wrap: anywhere; }
 .message-meta { display: flex; gap: 12px; align-items: baseline; margin-bottom: 10px; }
 .message-meta time { font-size: 12px; color: #616975; }
