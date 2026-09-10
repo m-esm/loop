@@ -26,5 +26,6 @@ test('parseTaskProposal accepts a complete proposal and rejects malformed ones',
   assert.match(missing.error, /missing why/);
   assert.equal(isProposalChoice(valid, 'SQLite'), true);
   assert.equal(isProposalChoice(valid, 'discuss'), true);
+  assert.equal(isProposalChoice(valid, 'reject'), true);
   assert.equal(isProposalChoice(valid, 'MySQL'), false);
 });

@@ -200,12 +200,26 @@ export class TaskStore {
         throw new BadRequestException('Task is not waiting for a decision');
       }
       if (!isProposalChoice(current.proposal, choice)) {
-        throw new BadRequestException('choice must be one of the proposal options or discuss');
+        throw new BadRequestException('choice must be one of the proposal options, discuss, or reject');
       }
       const ts = new Date().toISOString();
-      const task = this.database.db.update(tasks).set({
-        proposalChoice: choice, proposalBy: decidedBy, status: INITIAL_STATUS, updatedAt: ts,
-      }).where(and(eq(tasks.id, id), eq(tasks.status, 'needs_input'))).returning().get();
+      const declined = choice === 'reject';
+      const fields = declined
+        ? {
+            proposalChoice: choice,
+            proposalBy: decidedBy,
+            status: 'failed' as const,
+            error: `Proposal rejected by ${decidedBy}: ${current.proposal.pick}`,
+            updatedAt: ts,
+          }
+        : {
+            proposalChoice: choice,
+            proposalBy: decidedBy,
+            status: INITIAL_STATUS,
+            updatedAt: ts,
+          };
+      const task = this.database.db.update(tasks).set(fields)
+        .where(and(eq(tasks.id, id), eq(tasks.status, 'needs_input'))).returning().get();
       if (!task) {
         this.get(id);
         throw new BadRequestException('Task is not waiting for a decision');
