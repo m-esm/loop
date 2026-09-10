@@ -76,6 +76,24 @@ test('LOOP_RUNNER finishes /task without PATCH and fails FAIL: titles', async ()
   assert.equal(folded?.result, echo.result);
 });
 
+test('two /task posts route to echo and reviewer commands', async () => {
+  const echoId = await postTask('/task Echo me :: proof');
+  const reviewId = await postTask('/task @reviewer check the diff :: proof');
+  const echo = await waitTask(echoId, 'done');
+  const review = await waitTask(reviewId, 'done');
+  assert.equal(echo.result, 'Echo: Echo me');
+  assert.equal(echo.claimedBy, 'echo');
+  assert.equal(echo.agentId, null);
+  assert.equal(review.result, 'Reviewed: check the diff');
+  assert.equal(review.claimedBy, 'reviewer');
+  assert.equal(review.agentId, 'reviewer');
+  const ghostId = await postTask('/task @ghost unknown :: proof');
+  const ghost = await waitTask(ghostId, 'failed');
+  assert.match(ghost.error ?? '', /Unknown agent ghost/);
+  assert.match(ghost.error ?? '', /echo/);
+  assert.match(ghost.error ?? '', /reviewer/);
+});
+
 test('ASK: title parks, POST answer resumes, and the result carries the answer', async () => {
   const askId = await postTask('/task ASK: what colour :: proof');
   const parked = await waitTask(askId, 'needs_input');

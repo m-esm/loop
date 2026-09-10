@@ -8,6 +8,7 @@ export const tasks = sqliteTable('tasks', {
   roomId: text('room_id').notNull().default('default').references(() => rooms.id),
   title: text('title').notNull(),
   owner: text('owner').notNull(),
+  agentId: text('agent_id'),
   definitionOfDone: text('definition_of_done').notNull(),
   status: text('status').$type<TaskStatus>().notNull(),
   createdAt: text('created_at').notNull(),

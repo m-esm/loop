@@ -300,3 +300,61 @@ test('the child gets an allowlisted env and a cwd outside the API, not the serve
     delete process.env.LOOP_TEST_SECRET;
   }
 });
+
+test('a named agent runs its own command and claimedBy is that id', async () => {
+  rebuildRunner([
+    { id: 'echo', name: 'Echo', command: nodeCommand("process.stdout.write('from-echo\\n')") },
+    { id: 'reviewer', name: 'Reviewer', command: nodeCommand("process.stdout.write('from-reviewer\\n')") },
+  ]);
+  const assigned = store.create({ ...input, title: 'review me', agentId: 'reviewer' });
+  const unassigned = store.create({ ...input, title: 'echo me' });
+  runner.start();
+  await waitFor(() => store.get(assigned.id).status === 'done' && store.get(unassigned.id).status === 'done');
+  assert.equal(store.get(assigned.id).result, 'from-reviewer');
+  assert.equal(store.get(assigned.id).claimedBy, 'reviewer');
+  assert.equal(store.get(unassigned.id).result, 'from-echo');
+  assert.equal(store.get(unassigned.id).claimedBy, 'echo');
+});
+
+test('unknown agent fails through finish with the id and the known list', async () => {
+  rebuildRunner([
+    { id: 'echo', name: 'Echo', command: nodeCommand("process.stdout.write('from-echo\\n')") },
+    { id: 'reviewer', name: 'Reviewer', command: nodeCommand("process.stdout.write('from-reviewer\\n')") },
+  ]);
+  const task = store.create({ ...input, title: 'ghost me', agentId: 'ghost' });
+  runner.start();
+  await waitFor(() => store.get(task.id).status === 'failed');
+  const failed = store.get(task.id);
+  assert.equal(failed.status, 'failed');
+  assert.match(failed.error ?? '', /Unknown agent ghost/);
+  assert.match(failed.error ?? '', /echo/);
+  assert.match(failed.error ?? '', /reviewer/);
+  assert.equal(failed.claimedBy, 'ghost');
+  assert.equal(failed.result, null);
+  const kinds = bus.since(0).filter((event) => event.subject_id === task.id).map((event) => event.kind);
+  assert.ok(kinds.includes('task_status_changed'));
+  const next = store.create({ ...input, title: 'after ghost' });
+  await waitFor(() => store.get(next.id).status === 'done');
+  assert.equal(store.get(next.id).result, 'from-echo');
+});
+
+test('needs_input on a named agent resumes the same command', async () => {
+  rebuildRunner([
+    { id: 'echo', name: 'Echo', command: nodeCommand("process.stdout.write('from-echo\\n')") },
+    {
+      id: 'reviewer', name: 'Reviewer',
+      command: nodeCommand(
+        "const a=process.env.LOOP_TASK_ANSWER;if(a){process.stdout.write('reviewed '+a+'\\n')}else{process.stdout.write('LOOP_ASK: notes?\\n')}",
+      ),
+    },
+  ]);
+  const task = store.create({ ...input, title: 'review parked', agentId: 'reviewer' });
+  runner.start();
+  await waitFor(() => store.get(task.id).status === 'needs_input');
+  assert.equal(store.get(task.id).claimedBy, 'reviewer');
+  store.answer(task.id, 'lgtm', 'Moshe');
+  await waitFor(() => store.get(task.id).status === 'done');
+  const done = store.get(task.id);
+  assert.equal(done.result, 'reviewed lgtm');
+  assert.equal(done.claimedBy, 'reviewer');
+});

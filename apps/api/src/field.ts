@@ -8,6 +8,12 @@ export function field(body: unknown, key: string, limit: number): string {
   return value.trim();
 }
 
+export function optionalField(body: unknown, key: string, limit: number): string | undefined {
+  const value = body && typeof body === 'object' ? (body as Record<string, unknown>)[key] : undefined;
+  if (value === undefined) return undefined;
+  return field(body, key, limit);
+}
+
 export function roomId(value: unknown): string {
   if (value !== 'default') throw new BadRequestException('Unknown room');
   return value;

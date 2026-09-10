@@ -5,12 +5,13 @@ import { applyTaskEvent, needsHumanCount, sseBackoffDelay } from '../lib/feed';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
 import MessageCard from '../components/MessageCard';
+import TaskCard from '../components/TaskCard';
 
 function taskOf(over: Partial<Task> = {}): Task {
   return {
     id: 'task', roomId: 'default', title: 'Build', owner: 'Human', definitionOfDone: 'Proof',
     status: INITIAL_STATUS, createdAt: '', updatedAt: '',
-    claimedBy: null, runId: null, log: [], result: null, error: null,
+    agentId: null, claimedBy: null, runId: null, log: [], result: null, error: null,
     question: null, answer: null, answeredBy: null, ...over,
   };
 }
@@ -32,6 +33,12 @@ test('mixed replay keeps messages unique and a task card renders the updated tas
   const html = renderToStaticMarkup(createElement(MessageCard, { message: after.messages[0], task: after.tasks[0], author: 'Human' }));
   assert.ok(html.includes(TASK_STATUSES.at(-1)!));
   assert.ok(html.includes('Build'));
+  const withAgent = renderToStaticMarkup(createElement(TaskCard, {
+    task: taskOf({ agentId: 'reviewer' }), author: 'Human',
+  }));
+  assert.ok(withAgent.includes('Agent: reviewer'));
+  const withoutAgent = renderToStaticMarkup(createElement(TaskCard, { task: taskOf(), author: 'Human' }));
+  assert.equal(withoutAgent.includes('Agent:'), false);
 });
 
 test('replay upserts the same row and live status updates replace it', () => {

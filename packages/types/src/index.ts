@@ -12,6 +12,7 @@ export interface CreateTask {
   title: string;
   owner: string;
   definitionOfDone: string;
+  agentId?: string | null;
 }
 export interface Task extends CreateTask {
   roomId: string;
@@ -19,6 +20,7 @@ export interface Task extends CreateTask {
   status: TaskStatus;
   createdAt: string;
   updatedAt: string;
+  agentId: string | null;
   claimedBy: string | null;
   runId: string | null;
   log: string[];

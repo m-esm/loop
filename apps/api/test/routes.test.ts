@@ -24,7 +24,15 @@ test('POST /tasks validates fields, trims text, and returns a stored task', asyn
   const task = await create();
   assert.equal(task.title, input.title);
   assert.equal(task.status, INITIAL_STATUS);
-  for (const body of [{}, { ...input, owner: ' ' }, { ...input, title: 'a'.repeat(201) }, { ...input, definitionOfDone: 123 }]) {
+  assert.equal(task.agentId, null);
+  const named = await fetch(`${url}/tasks`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...input, agentId: ' reviewer ' }),
+  });
+  assert.equal(named.status, 201);
+  assert.equal((await named.json() as Task).agentId, 'reviewer');
+  for (const body of [{}, { ...input, owner: ' ' }, { ...input, title: 'a'.repeat(201) }, { ...input, definitionOfDone: 123 },
+    { ...input, agentId: ' ' }, { ...input, agentId: 'a'.repeat(101) }]) {
     const response = await fetch(`${url}/tasks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     assert.equal(response.status, 400);
   }
