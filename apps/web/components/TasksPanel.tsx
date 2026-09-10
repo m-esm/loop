@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { chipClass, type Task } from '@loop/types';
+import { chipClass, isActiveStatus, type Task } from '@loop/types';
 import CreateTaskForm from './CreateTaskForm';
 
 export default function TasksPanel({ tasks }: { tasks: Task[] }) {
@@ -23,6 +23,12 @@ export default function TasksPanel({ tasks }: { tasks: Task[] }) {
     {detail && createPortal(<section className="task-detail" aria-label="Task detail">
       <h3>{detail.title}</h3><p>Owner: {detail.owner}</p>
       <strong>Done when</strong><p>{detail.definitionOfDone}</p>
+      {detail.log.length > 0 && <details>
+        <summary>Log</summary>
+        <pre data-task-log>{detail.log.join('\n')}</pre>
+      </details>}
+      {!isActiveStatus(detail.status) && detail.result && <p data-task-result className="task-result">{detail.result}</p>}
+      {!isActiveStatus(detail.status) && detail.error && <p data-task-error className="task-error">{detail.error}</p>}
       <button onClick={() => setSelected(null)}>Close detail</button>
     </section>, document.getElementById('task-context')!)}
   </section>;
