@@ -48,4 +48,19 @@ export class MessageStore {
     if (event.kind !== 'message_created') throw new Error('Unexpected event kind');
     return event.payload.message;
   }
+
+  /** Card for an already-created task, so a spawned child shows in the transcript. */
+  attachTask(room: string, author: string, taskId: string) {
+    roomId(room);
+    this.tasks.get(taskId);
+    const event = this.bus.emitEvent(() => {
+      const ts = new Date().toISOString();
+      const message = this.database.db.insert(messages).values({
+        id: randomUUID(), roomId: room, author, body: { kind: 'task', taskId }, createdAt: ts,
+      }).returning().get();
+      return { subject_id: message.id, room_id: message.roomId, ts, kind: 'message_created', payload: { message } };
+    });
+    if (event.kind !== 'message_created') throw new Error('Unexpected event kind');
+    return event.payload.message;
+  }
 }

@@ -17,6 +17,7 @@ const originalWallMs = process.env.LOOP_WALL_MS;
 let database: Database;
 let bus: EventBus;
 let store: TaskStore;
+let messages: MessageStore;
 let runner: TaskRunner;
 let dir: string | undefined;
 
@@ -29,7 +30,7 @@ function rebuildRunner(agents: { id: string; name: string; command: string[] }[]
   writeFileSync(path, JSON.stringify({ agents }));
   process.env.LOOP_AGENTS_PATH = path;
   runner.stop();
-  runner = new TaskRunner(store, bus);
+  runner = new TaskRunner(store, bus, messages);
 }
 
 async function waitFor(check: () => boolean, ms = 5000) {
@@ -47,7 +48,8 @@ beforeEach(() => {
   database = new Database();
   bus = new EventBus(database);
   store = new TaskStore(database, bus);
-  runner = new TaskRunner(store, bus);
+  messages = new MessageStore(database, bus, store);
+  runner = new TaskRunner(store, bus, messages);
 });
 
 afterEach(async () => {
@@ -115,7 +117,8 @@ test('reclaim on a new API process against the same file emits runner lost', () 
   database = new Database();
   bus = new EventBus(database);
   store = new TaskStore(database, bus);
-  runner = new TaskRunner(store, bus);
+  messages = new MessageStore(database, bus, store);
+  runner = new TaskRunner(store, bus, messages);
   const before = bus.latestId();
   runner.start();
   const lost = store.get(task.id);
@@ -230,7 +233,7 @@ test('partial stdout without a trailing newline is flushed on exit', async () =>
 test('missing agents file leaves tasks queued', async () => {
   process.env.LOOP_AGENTS_PATH = join(dir!, 'missing-agents.json');
   runner.stop();
-  runner = new TaskRunner(store, bus);
+  runner = new TaskRunner(store, bus, messages);
   const task = store.create(input);
   runner.start();
   await new Promise((resolve) => defer(resolve));
@@ -435,4 +438,67 @@ test('needs_input on a named agent resumes the same command', async () => {
   const done = store.get(task.id);
   assert.equal(done.result, 'reviewed lgtm');
   assert.equal(done.claimedBy, 'reviewer');
+});
+
+test('LOOP_SPAWN creates children without parking the parent, then the children run', async () => {
+  const first = JSON.stringify({ title: 'First child', definitionOfDone: 'one', agentId: 'echo' });
+  const second = JSON.stringify({ title: 'Second child', definitionOfDone: 'two', agentId: 'echo' });
+  rebuildRunner([
+    {
+      id: 'planner', name: 'Planner',
+      command: nodeCommand(
+        `process.stdout.write(${JSON.stringify(`LOOP_SPAWN: ${first}\n`)});process.stdout.write(${JSON.stringify(`LOOP_SPAWN: ${second}\n`)});process.stdout.write('parent-done\\n')`,
+      ),
+    },
+    { id: 'echo', name: 'Echo', command: nodeCommand("process.stdout.write('child-done\\n')") },
+  ]);
+  const parent = store.create({ ...input, title: 'Break this down', agentId: 'planner' });
+  runner.start();
+  await waitFor(() => store.get(parent.id).status === 'done');
+  assert.equal(store.get(parent.id).result, 'parent-done');
+  assert.equal(store.get(parent.id).error, null);
+  const children = store.list().tasks.filter((row) => row.parentTaskId === parent.id);
+  assert.equal(children.length, 2);
+  assert.deepEqual(children.map((row) => row.title).sort(), ['First child', 'Second child']);
+  assert.ok(children.every((row) => row.roomId === parent.roomId));
+  await waitFor(() => children.every((row) => store.get(row.id).status === 'done'));
+  assert.ok(children.every((row) => store.get(row.id).result === 'child-done'));
+  const cards = messages.list(parent.roomId).messages.filter((message) => message.body.kind === 'task');
+  assert.equal(cards.length, 2);
+});
+
+test('malformed LOOP_SPAWN logs on the parent and the parent still finishes', async () => {
+  rebuildRunner([{
+    id: 'planner', name: 'Planner',
+    command: nodeCommand("process.stdout.write('LOOP_SPAWN: {\\n');process.stdout.write('parent-done\\n')"),
+  }]);
+  const parent = store.create({ ...input, title: 'Bad spawn', agentId: 'planner' });
+  runner.start();
+  await waitFor(() => store.get(parent.id).status === 'done');
+  const done = store.get(parent.id);
+  assert.equal(done.result, 'parent-done');
+  assert.ok(done.log.some((line) => /Malformed spawn/.test(line)));
+  assert.equal(store.list().tasks.filter((row) => row.parentTaskId === parent.id).length, 0);
+});
+
+test('LOOP_SPAWN with an unknown agent fails the child and not the parent', async () => {
+  const payload = JSON.stringify({ title: 'Ghost child', definitionOfDone: 'x', agentId: 'ghost' });
+  rebuildRunner([
+    {
+      id: 'planner', name: 'Planner',
+      command: nodeCommand(
+        `process.stdout.write(${JSON.stringify(`LOOP_SPAWN: ${payload}\n`)});process.stdout.write('parent-done\\n')`,
+      ),
+    },
+    { id: 'echo', name: 'Echo', command: nodeCommand("process.stdout.write('child-done\\n')") },
+  ]);
+  const parent = store.create({ ...input, title: 'Spawn ghost', agentId: 'planner' });
+  runner.start();
+  await waitFor(() => store.get(parent.id).status === 'done');
+  assert.equal(store.get(parent.id).result, 'parent-done');
+  const child = store.list().tasks.find((row) => row.parentTaskId === parent.id);
+  assert.ok(child, 'expected a spawned child');
+  const childId = child.id;
+  await waitFor(() => store.get(childId).status === 'failed');
+  assert.match(store.get(childId).error ?? '', /Unknown agent ghost/);
 });

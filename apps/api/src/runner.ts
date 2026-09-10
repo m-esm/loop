@@ -4,14 +4,16 @@ import { once } from 'node:events';
 import { tmpdir } from 'node:os';
 import { setImmediate as defer, setInterval, setTimeout, clearInterval, clearTimeout } from 'node:timers';
 import type { Readable } from 'node:stream';
-import { INITIAL_STATUS, parseTaskProposal, type Task } from '@loop/types';
+import { INITIAL_STATUS, parseTaskProposal, parseTaskSpawn, type Task } from '@loop/types';
 import { loadAgents, type AgentConfig } from './agents';
 import { EventBus } from './bus';
+import { MessageStore } from './message-store';
 import { RunFenceError, TaskStore } from './task-store';
 
 const PROGRESS_MIN_INTERVAL_MS = 500;
 const ASK_PREFIX = 'LOOP_ASK: ';
 const PROPOSE_PREFIX = 'LOOP_PROPOSE: ';
+const SPAWN_PREFIX = 'LOOP_SPAWN: ';
 
 function wallMs() {
   const value = Number(process.env.LOOP_WALL_MS);
@@ -56,6 +58,7 @@ export class TaskRunner implements OnModuleInit, OnModuleDestroy {
   constructor(
     @Inject(TaskStore) private readonly store: TaskStore,
     @Inject(EventBus) private readonly bus: EventBus,
+    @Inject(MessageStore) private readonly messages: MessageStore,
   ) {
     this.agents = loadAgents();
   }
@@ -175,6 +178,28 @@ export class TaskRunner implements OnModuleInit, OnModuleDestroy {
           if (!(error instanceof RunFenceError)) throw error;
         }
         child?.kill('SIGKILL');
+        return;
+      }
+      if (line.startsWith(SPAWN_PREFIX)) {
+        const parsed = parseTaskSpawn(line.slice(SPAWN_PREFIX.length));
+        if ('error' in parsed) {
+          push(parsed.error, 'stderr');
+          return;
+        }
+        try {
+          const childTask = this.store.create({
+            roomId: task.roomId,
+            owner: task.owner,
+            title: parsed.spawn.title,
+            definitionOfDone: parsed.spawn.definitionOfDone,
+            parentTaskId: id,
+            ...(parsed.spawn.agentId ? { agentId: parsed.spawn.agentId } : {}),
+          });
+          this.messages.attachTask(task.roomId, task.owner, childTask.id);
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : 'spawn failed';
+          push(reason, 'stderr');
+        }
         return;
       }
       push(line, 'stdout');

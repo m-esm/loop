@@ -27,6 +27,7 @@ export const tasks = sqliteTable('tasks', {
   proposal: text('proposal', { mode: 'json' }).$type<TaskProposal>(),
   proposalChoice: text('proposal_choice'),
   proposalBy: text('proposal_by'),
+  parentTaskId: text('parent_task_id'),
 });
 export const events = sqliteTable('events', {
   id: integer('id').primaryKey({ autoIncrement: true }),

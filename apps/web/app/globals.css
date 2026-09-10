@@ -94,6 +94,13 @@ th, td { padding: 14px 8px; border-bottom: 1px solid #e2e6eb; vertical-align: to
 }
 .chat-task h3 { margin-bottom: 8px; font-size: 16px; }
 .chat-task p { margin: 8px 0 0; font-size: 14px; }
+/* fit-content so a stretched block line fails the width assertion. */
+.task-parent {
+  width: fit-content;
+  max-width: 100%;
+  color: #616975;
+  overflow-wrap: anywhere;
+}
 .task-question { color: #795213; font-weight: 600; font-size: 16px; }
 .task-answer { color: #245737; }
 .answer-form {

@@ -14,7 +14,7 @@ function taskOf(over: Partial<Task> = {}): Task {
     agentId: null, claimedBy: null, runId: null, log: [], result: null, error: null,
     question: null, answer: null, answeredBy: null,
     verdict: null, verdictNote: null, verdictBy: null,
-    proposal: null, proposalChoice: null, proposalBy: null, ...over,
+    proposal: null, proposalChoice: null, proposalBy: null, parentTaskId: null, ...over,
   };
 }
 
@@ -76,6 +76,20 @@ test('mixed replay keeps messages unique and a task card renders the updated tas
   assert.ok(decided.includes('data-task-choice'));
   assert.ok(decided.includes('Postgres by Moshe'));
   assert.equal(decided.includes('name="approve"'), false);
+  const parent = taskOf({ id: 'parent', title: 'Break this down' });
+  const child = taskOf({ id: 'child', title: 'Review the split', parentTaskId: parent.id });
+  const withParent = renderToStaticMarkup(createElement(TaskCard, {
+    task: child, author: 'Moshe', tasks: [parent, child],
+  }));
+  assert.ok(withParent.includes('data-task-parent'));
+  assert.ok(withParent.includes('From: Break this down'));
+  const missingParent = renderToStaticMarkup(createElement(TaskCard, {
+    task: child, author: 'Moshe',
+  }));
+  assert.ok(missingParent.includes('From: parent'));
+  assert.equal(missingParent.includes('From: Break this down'), false);
+  const root = renderToStaticMarkup(createElement(TaskCard, { task: parent, author: 'Moshe' }));
+  assert.equal(root.includes('data-task-parent'), false);
 });
 
 test('replay upserts the same row and live status updates replace it', () => {

@@ -18,6 +18,12 @@ export class RunFenceError extends Error {
   }
 }
 
+export function assertParentLink(id: string, parentTaskId: string | null) {
+  if (parentTaskId && parentTaskId === id) {
+    throw new BadRequestException('A task may not be its own parent');
+  }
+}
+
 export function capLog(lines: string[]): string[] {
   const clipped = lines.map((line) => line.slice(0, LOG_MAX_CHARS));
   const limited = clipped.length > LOG_MAX_LINES ? clipped.slice(clipped.length - LOG_MAX_LINES) : clipped;
@@ -55,9 +61,19 @@ export class TaskStore {
   create(input: CreateTask) {
     const event = this.bus.emitEvent(() => {
       const ts = new Date().toISOString();
+      const id = randomUUID();
+      const room = roomId(input.roomId ?? 'default');
+      const parentTaskId = input.parentTaskId ?? null;
+      if (parentTaskId) {
+        assertParentLink(id, parentTaskId);
+        const parent = this.database.db.select().from(tasks).where(eq(tasks.id, parentTaskId)).get();
+        if (!parent) throw new BadRequestException('Parent task not found');
+        if (parent.roomId !== room) throw new BadRequestException('Parent task is not in the same room');
+      }
       const task = this.database.db.insert(tasks).values({
-        ...input, roomId: roomId(input.roomId ?? 'default'), id: randomUUID(), status: INITIAL_STATUS,
-        agentId: input.agentId ?? null, createdAt: ts, updatedAt: ts, log: [],
+        title: input.title, owner: input.owner, definitionOfDone: input.definitionOfDone,
+        roomId: room, id, status: INITIAL_STATUS,
+        agentId: input.agentId ?? null, parentTaskId, createdAt: ts, updatedAt: ts, log: [],
       }).returning().get();
       return { subject_id: task.id, room_id: task.roomId, ts, kind: 'task_created', payload: { task } };
     });

@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { chipClass, isActiveStatus, isRunningStatus, type Task } from '@loop/types';
 import { api } from '../lib/api';
 
-export default function TaskCard({ task, author }: { task: Task; author: string }) {
+export default function TaskCard({ task, author, tasks = [] }: { task: Task; author: string; tasks?: Task[] }) {
   const terminal = !isActiveStatus(task.status);
   const proposing = task.status === 'needs_input' && !!task.proposal && !task.proposalChoice;
   const waiting = task.status === 'needs_input' && !!task.question && !proposing;
@@ -71,6 +71,9 @@ export default function TaskCard({ task, author }: { task: Task; author: string 
   }
   const selected = choice || task.proposal?.pick || '';
   const proposal = task.proposal;
+  const parentTitle = task.parentTaskId
+    ? (tasks.find((row) => row.id === task.parentTaskId)?.title ?? task.parentTaskId)
+    : null;
   const logCount = task.log.length;
   const logText = task.log.join('\n');
   const logSummary = isActiveStatus(task.status)
@@ -83,6 +86,7 @@ export default function TaskCard({ task, author }: { task: Task; author: string 
   }, [logText]);
   return <div className={waiting || proposing ? 'chat-task question-card' : 'chat-task'} data-task-id={task.id}>
     <h3>{task.title}</h3><span className={chipClass(task.status)}>{task.status}</span>
+    {parentTitle && <p data-task-parent className="task-parent">From: {parentTitle}</p>}
     <p>Owner: {task.owner}</p>
     {task.agentId && <p data-task-agent>Agent: {task.agentId}</p>}
     <p className="done-when" title={task.definitionOfDone}>Done when: {task.definitionOfDone}</p>

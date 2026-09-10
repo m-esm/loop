@@ -256,7 +256,8 @@ function generate(): string {
     'Stdout and stderr stream into the task log. Exit 0 finishes `done` with the last nonempty stdout line; nonzero fails with the last nonempty stderr line.',
     'An agent asks by writing a `LOOP_ASK:` line; the runner parks the task in `needs_input` and reruns the same agent with `LOOP_TASK_ANSWER` after a human answers.',
     'An agent proposes by writing a `LOOP_PROPOSE:` JSON line; the runner parks the task in `needs_input` and reruns with `LOOP_TASK_CHOICE` after a human decides. A malformed proposal fails the task.',
-    'A finished task can be accepted or rejected. Reject requeues the same agent, clears the previous run, and passes `LOOP_TASK_NOTE` on the next spawn.',
+    'An agent spawns a child by writing a `LOOP_SPAWN:` JSON line. The parent keeps running. A malformed spawn is logged on the parent and does not fail it. The child is created through the task store so the runner can claim it next.',
+    'A finished task can be accepted or rejected. Reject requeues the same agent, clears the previous run, and passes `LOOP_TASK_NOTE` on the next spawn. `parentTaskId` survives finish and send-back.',
     'The seeded echo agent stays first and keeps the `FAIL:` and `ASK:` title conventions so existing browser specs still pass. A second seeded reviewer agent has a different command.',
     'Claim, progress, finish, ask, answer, review, propose, and decide go through the task store; the bus remains the single `insert(events)` path.',
     'Migration `0002_task_run.sql` adds `claimed_by`, `run_id`, `log`, `result`, and `error`.',
@@ -264,6 +265,7 @@ function generate(): string {
     'Migration `0004_task_agent.sql` adds nullable `agent_id`.',
     'Migration `0005_task_verdict.sql` adds nullable `verdict`, `verdict_note`, and `verdict_by`.',
     'Migration `0006_task_proposal.sql` adds nullable `proposal`, `proposal_choice`, and `proposal_by`.',
+    'Migration `0007_task_parent.sql` adds nullable `parent_task_id` referencing `tasks(id)`.',
     '',
   ];
 
