@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import type { Message, Task } from '@loop/types';
+import { isActiveStatus, type Message, type Task } from '@loop/types';
 import MessageCard from './MessageCard';
 
 export default function Transcript({ messages, tasks, author }: { messages: Message[]; tasks: Task[]; author: string }) {
@@ -18,7 +18,12 @@ export default function Transcript({ messages, tasks, author }: { messages: Mess
   // render while a question waits: a card ABOVE it can grow later (a verdict
   // form appearing on a finished task) and push the answer form below the fold.
   useEffect(() => {
-    const waiting = tasks.filter((task) => task.status === 'needs_input').map((task) => task.id);
+    // A finished task with no verdict is also waiting on a human: UI.md counts
+    // "waiting on human acceptance" alongside questions. Both must stay reachable.
+    const waiting = tasks
+      .filter((task) => task.status === 'needs_input'
+        || (!isActiveStatus(task.status) && !task.verdict))
+      .map((task) => task.id);
     const fresh = waiting.length > 0;
     pinned.current = new Set(waiting);
     if (!fresh) return;

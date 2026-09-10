@@ -94,6 +94,10 @@ test('a finished task can be accepted or rejected and sent back with a note', as
     await expect(keepCard.getByRole('button', { name: 'Reject', exact: true })).toHaveCount(0);
     await expect(keepCard.locator('.tp-chip')).toHaveText('done');
     await expect(sendCard.getByRole('button', { name: 'Reject', exact: true })).toBeVisible();
+    // Visible is not reachable. A button half under the composer cannot be clicked.
+    await expect(sendCard.getByRole('button', { name: 'Accept', exact: true })).toBeInViewport({ ratio: 1 });
+    await expect(sendCard.getByRole('button', { name: 'Reject', exact: true })).toBeInViewport({ ratio: 1 });
+    await expect(sendCard.getByLabel('Note')).toBeInViewport({ ratio: 1 });
 
     await page.screenshot({ path: resolve('docs/screenshots/result-card.png') });
 
@@ -107,11 +111,17 @@ test('a finished task can be accepted or rejected and sent back with a note', as
     expect(requeued.runId).toBeNull();
     expect(requeued.result).toBeNull();
     expect(requeued.verdict).toBe('rejected');
-    await expect(sendCard.getByRole('button', { name: 'Accept', exact: true })).toHaveCount(0);
-    await expect(sendCard.locator('[data-task-verdict]')).toContainText('Rejected by Moshe');
+    // The rejected verdict is observable on the API response above. In the browser
+    // the re-run may already be finishing, so asserting the intermediate state here
+    // would race it; the post-rerun assertions below are the real proof.
     await expect(sendCard.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
     await expect(sendCard.locator('[data-task-result]')).toHaveText('resent: too thin');
-    await expect(sendCard.locator('[data-task-verdict]')).toHaveText('Rejected by Moshe: too thin');
+    // The re-run is a NEW unreviewed result: the old verdict must be gone and the
+    // buttons must come back, or a sent-back task can never be accepted.
+    await expect(sendCard.locator('[data-task-verdict]')).toHaveCount(0);
+    await expect(sendCard.getByRole('button', { name: 'Accept', exact: true })).toBeVisible();
+    await sendCard.getByRole('button', { name: 'Accept', exact: true }).click();
+    await expect(sendCard.locator('[data-task-verdict]')).toHaveText('Accepted by Moshe');
 
     const keepTask = await (await request.get(`${apiUrl}/tasks/${keepId}`)).json() as Task;
     const sendTask = await (await request.get(`${apiUrl}/tasks/${sendId}`)).json() as Task;
@@ -120,8 +130,8 @@ test('a finished task can be accepted or rejected and sent back with a note', as
     expect(keepTask.verdictBy).toBe('Moshe');
     expect(keepTask.result).toBe('first-pass');
     expect(sendTask.status).toBe('done');
-    expect(sendTask.verdict).toBe('rejected');
-    expect(sendTask.verdictNote).toBe('too thin');
+    expect(sendTask.verdict).toBe('accepted');
+    expect(sendTask.verdictNote).toBeNull();
     expect(sendTask.result).toBe('resent: too thin');
   } finally {
     await Promise.all(contexts.map((item) => item.close()));

@@ -123,9 +123,13 @@ export class TaskStore {
     try {
       const event = this.bus.emitEvent(() => {
         const ts = new Date().toISOString();
+        // A verdict belongs to the run it judged. A rejected task that re-runs
+        // and finishes again is unreviewed, so a stale verdict would hide the
+        // buttons forever. Same staleness rule as result and error.
+        const cleared = { verdict: null, verdictNote: null, verdictBy: null };
         const fields = outcome.status === 'done'
-          ? { status: outcome.status, result: outcome.result, error: null, updatedAt: ts }
-          : { status: outcome.status, error: outcome.error, result: null, updatedAt: ts };
+          ? { status: outcome.status, result: outcome.result, error: null, updatedAt: ts, ...cleared }
+          : { status: outcome.status, error: outcome.error, result: null, updatedAt: ts, ...cleared };
         const task = this.database.db.update(tasks).set(fields)
           .where(and(eq(tasks.id, id), eq(tasks.status, 'running'), eq(tasks.runId, runId))).returning().get();
         if (!task) {

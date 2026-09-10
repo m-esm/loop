@@ -39,6 +39,9 @@ export default function TaskCard({ task, author }: { task: Task; author: string 
           verdict, reviewedBy: author, ...(trimmed ? { note: trimmed } : {}),
         }),
       });
+      // A submitted note belongs to that verdict. Leaving it in the box means a
+      // send-back note gets resubmitted with the next verdict on the re-run.
+      setNote('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Review could not be sent.');
     } finally { setBusy(false); }
