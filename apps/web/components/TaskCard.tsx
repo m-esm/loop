@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { chipClass, isActiveStatus, isRunningStatus, type Task } from '@loop/types';
 import { api } from '../lib/api';
 
@@ -11,6 +11,8 @@ export default function TaskCard({ task, author }: { task: Task; author: string 
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const logPre = useRef<HTMLPreElement>(null);
+  const followLog = useRef(true);
   async function submit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -47,10 +49,15 @@ export default function TaskCard({ task, author }: { task: Task; author: string 
     } finally { setBusy(false); }
   }
   const logCount = task.log.length;
+  const logText = task.log.join('\n');
   const logSummary = isActiveStatus(task.status)
     ? `Work in progress · ${logCount} ${logCount === 1 ? 'line' : 'lines'}`
     : `What happened · ${logCount} ${logCount === 1 ? 'line' : 'lines'}`;
   const showLog = logCount > 0 || isRunningStatus(task.status);
+  useLayoutEffect(() => {
+    const element = logPre.current;
+    if (element && followLog.current) element.scrollTop = element.scrollHeight;
+  }, [logText]);
   return <div className={waiting ? 'chat-task question-card' : 'chat-task'} data-task-id={task.id}>
     <h3>{task.title}</h3><span className={chipClass(task.status)}>{task.status}</span>
     <p>Owner: {task.owner}</p>
@@ -66,9 +73,18 @@ export default function TaskCard({ task, author }: { task: Task; author: string 
     {task.answer && <p data-task-answer className="task-answer">
       Answered by {task.answeredBy ?? 'unknown'}: {task.answer}
     </p>}
-    {showLog && <details>
+    {showLog && <details onToggle={(event) => {
+      if (!event.currentTarget.open) return;
+      const element = logPre.current;
+      if (!element) return;
+      followLog.current = true;
+      element.scrollTop = element.scrollHeight;
+    }}>
       <summary>{logSummary}</summary>
-      <pre data-task-log>{task.log.join('\n')}</pre>
+      <pre data-task-log ref={logPre} onScroll={(event) => {
+        const element = event.currentTarget;
+        followLog.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+      }}>{logText}</pre>
     </details>}
     {terminal && task.result && <p data-task-result className="task-result">{task.result}</p>}
     {terminal && task.error && <p data-task-error className="task-error">{task.error}</p>}

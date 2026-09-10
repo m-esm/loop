@@ -69,7 +69,12 @@ th, td { padding: 14px 8px; border-bottom: 1px solid #e2e6eb; vertical-align: to
   gap: 8px;
   text-decoration: none;
 }
-.needs-human-pill {
+.room-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.needs-human-pill, .tab-running-pill {
   display: inline-block;
   min-width: 1.4em;
   padding: 2px 7px;
@@ -81,6 +86,11 @@ th, td { padding: 14px 8px; border-bottom: 1px solid #e2e6eb; vertical-align: to
   font-weight: 600;
   text-align: center;
   flex: 0 0 auto;
+}
+.tab-running-pill {
+  background: #e3eefc;
+  color: #254a7d;
+  border-color: #c5d6ef;
 }
 .chat-task h3 { margin-bottom: 8px; font-size: 16px; }
 .chat-task p { margin: 8px 0 0; font-size: 14px; }
@@ -97,7 +107,7 @@ th, td { padding: 14px 8px; border-bottom: 1px solid #e2e6eb; vertical-align: to
 }
 .done-when { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-task details, .task-detail details { margin-top: 10px; font-size: 13px; }
-.chat-task pre, .task-detail pre { white-space: pre-wrap; background: #f7f8fa; padding: 8px; border-radius: 4px; overflow: auto; max-height: 200px; }
+.chat-task pre, .task-detail pre { white-space: pre-wrap; background: #f7f8fa; padding: 8px; border-radius: 4px; overflow: auto; max-height: 200px; overflow-anchor: none; }
 .task-result { color: #245737; }
 .task-error { color: #823232; }
 .task-verdict { color: #254a7d; }
