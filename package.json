@@ -10,7 +10,8 @@
     "evidence": "node --import tsx scripts/generate-evidence.ts",
     "test": "npm run build -w @loop/types && npm run test --workspaces",
     "dev": "npm run build -w @loop/types && concurrently -k -n types,api,web \"npm run dev -w @loop/types\" \"npm run dev -w @loop/api\" \"npm run dev -w @loop/web\"",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "smoke": "playwright test tests/smoke.spec.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

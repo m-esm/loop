@@ -50,12 +50,24 @@ from it. `npm run lint` also rejects mirrored status arrays and unions.
 ## Verify
 
 ```sh
+npm run smoke   # ~4s: one chat message, one short task
 npm run lint
 npm run test
 npm run build
 npm run test:e2e
 npm audit
 ```
+
+`npm run smoke` is the one to run while you work. It proves the two things the
+product does at all: a chat message reaches the transcript, and a `/task` runs a
+real command and finishes with that command's output. Its agent exits
+immediately, so the whole spec takes about four seconds. Run it after every
+change, not only before a pull request. The full suite still runs three times
+before a PR, because a single pass has hidden a port race here before.
+
+If the web server refuses to start with `Another next dev server is already
+running`, a previous run left one behind. `kill` the PID it names; the port
+being free is not enough, since Next also refuses when it finds its own lock.
 
 The browser test requires Playwright Chromium (`npx playwright install chromium`
 on a new machine). Run `npm run test` or `npm run build` first to compile the
