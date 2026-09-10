@@ -48,6 +48,11 @@ test('an owner adds an agent from the catalog and a /task @name routes to it', a
     await form.getByLabel('Name').fill('scout');
     await form.getByRole('button', { name: 'Add' }).click();
     await expect(page.locator('.room-agents li').filter({ hasText: '@scout' })).toBeVisible();
+    // The panel is a component we ship, so capture it and assert the controls are
+    // fully on screen: a clipped Add button passes toBeVisible and is still unusable.
+    await expect(form.getByRole('button', { name: 'Add' })).toBeInViewport({ ratio: 1 });
+    await expect(form.getByLabel('Catalog')).toBeInViewport({ ratio: 1 });
+    await expect(page.locator('.room-agents li').filter({ hasText: '@scout' })).toBeInViewport({ ratio: 1 });
 
     await page.getByLabel('Message', { exact: true }).fill('/task @scout Named scout :: proof');
     const posted = page.waitForResponse((response) => response.url().endsWith('/messages') && response.request().method() === 'POST');
@@ -57,6 +62,7 @@ test('an owner adds an agent from the catalog and a /task @name routes to it', a
     const card = page.locator('.chat-task').filter({ hasText: 'Named scout' });
     await expect(card.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
     await expect(card.locator('[data-task-result]')).toHaveText(probeToken);
+    await page.screenshot({ path: 'docs/screenshots/room-agents.png' });
     const task = await (await request.get(`${apiUrl}/tasks/${cardMessage.body.taskId}`)).json() as Task;
     expect(task.agentId).toBe('scout');
     expect(task.claimedBy).toBe('probe');
