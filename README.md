@@ -71,6 +71,11 @@ If the web server refuses to start with `Another next dev server is already
 running`, a previous run left one behind. `kill` the PID it names; the port
 being free is not enough, since Next also refuses when it finds its own lock.
 
+`npm run smoke` builds the API first, so it works on a fresh `npm ci` where
+`apps/api/dist` does not exist yet. Without that build the browser loads a page
+whose API never started, and the failure reads as a missing `[data-live]`
+element rather than a missing build.
+
 The browser test requires Playwright Chromium (`npx playwright install chromium`
 on a new machine). Run `npm run test` or `npm run build` first to compile the
 API. The browser test owns ports 3100 and 3101, uses a temporary SQLite file,
