@@ -28,6 +28,8 @@ test('two /task posts route to two different agent commands', async ({ browser, 
   let output = '';
   const contexts: BrowserContext[] = [];
   const apiUrl = 'http://127.0.0.1:3101/api';
+  // This spec starts its API once against a fresh database.
+  const expectedTasks = () => 0;
   async function startApi() {
     api = spawn(process.execPath, ['dist/src/main.js'], {
       cwd: resolve('apps/api'),
@@ -45,7 +47,14 @@ test('two /task posts route to two different agent commands', async ({ browser, 
     api.stderr?.on('data', (chunk) => { output += chunk; });
     await expect.poll(async () => {
       if (api?.exitCode != null) throw new Error(output);
-      return request.get(`${apiUrl}/tasks`).then((response) => response.status()).catch(() => 0);
+      // A 200 only proves something answers on 3101. Every spec uses that port, so
+      // a leftover server from an earlier spec passes this poll and then serves
+      // this spec's requests against the wrong database and config. Require a task
+      // list this spec's own fresh database is the only one that can return.
+      return request.get(`${apiUrl}/tasks`)
+        .then(async (response) => (response.status() === 200
+          && ((await response.json()) as { tasks: unknown[] }).tasks.length === expectedTasks() ? 200 : 0))
+        .catch(() => 0);
     }).toBe(200);
   }
   async function stopApi() {
@@ -85,6 +94,9 @@ test('two /task posts route to two different agent commands', async ({ browser, 
     await expect(reviewCard.locator('[data-task-result]')).toHaveText(reviewToken);
     await expect(echoCard.locator('[data-task-agent]')).toHaveCount(0);
     await expect(reviewCard.locator('[data-task-agent]')).toHaveText('Agent: reviewer');
+    // Its own file: room-chat.png is written by two other specs, so a shared
+    // path means whichever spec runs last decides what the repo shows.
+    await page.screenshot({ path: resolve('docs/screenshots/agent-routing.png') });
 
     const echoTask = await (await request.get(`${apiUrl}/tasks/${echoId}`)).json() as Task;
     const reviewTask = await (await request.get(`${apiUrl}/tasks/${reviewId}`)).json() as Task;

@@ -12,6 +12,10 @@ test('two tabs receive creates and status changes, then reconnect and replay aft
   let output = '';
   const contexts: BrowserContext[] = [];
   const apiUrl = 'http://127.0.0.1:3101/api';
+  // This spec restarts the API against the same database, so the expected row
+  // count is whatever it has created so far, not zero.
+  let createdTasks = 0;
+  const expectedTasks = () => createdTasks;
   async function startApi() {
     api = spawn(process.execPath, ['dist/src/main.js'], {
       cwd: resolve('apps/api'),
@@ -20,9 +24,16 @@ test('two tabs receive creates and status changes, then reconnect and replay aft
     });
     api.stdout?.on('data', (chunk) => { output += chunk; });
     api.stderr?.on('data', (chunk) => { output += chunk; });
+    // A 200 only proves something answers on 3101. Every spec uses that port, so
+    // a leftover server from an earlier spec passes this poll and then serves
+    // this spec's requests against the wrong database and config. Require a task
+    // list this spec's own fresh database is the only one that can return.
     await expect.poll(async () => {
       if (api?.exitCode != null) throw new Error(output);
-      return request.get(`${apiUrl}/tasks`).then((response) => response.status()).catch(() => 0);
+      return request.get(`${apiUrl}/tasks`)
+        .then(async (response) => (response.status() === 200
+          && ((await response.json()) as { tasks: unknown[] }).tasks.length === expectedTasks() ? 200 : 0))
+        .catch(() => 0);
     }).toBe(200);
   }
   async function stopApi() {
@@ -106,6 +117,10 @@ test('two tabs receive creates and status changes, then reconnect and replay aft
     await expect(row.getByText(running, { exact: true })).toBeVisible({ timeout: 1000 });
     console.log(`API PATCH changed the task to ${running}; Tab B updated the existing row within 1 second.`);
     const cursor = (await (await request.get(`${apiUrl}/tasks`)).json() as TaskSnapshot).since;
+    // Read while the API is still up. After the restart these rows must still be
+    // there, which also proves the responder is this spec's server, not a
+    // leftover on 3101 with a different database.
+    createdTasks = ((await (await request.get(`${apiUrl}/tasks`)).json()) as TaskSnapshot).tasks.length;
     const hiddenReconnects: string[] = [];
     tabA.on('request', (req) => { if (req.url().includes('/stream')) hiddenReconnects.push(req.url()); });
     // Deterministically simulate background visibility in headless Chromium.
