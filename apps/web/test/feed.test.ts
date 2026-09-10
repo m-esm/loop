@@ -13,7 +13,8 @@ function taskOf(over: Partial<Task> = {}): Task {
     status: INITIAL_STATUS, createdAt: '', updatedAt: '',
     agentId: null, claimedBy: null, runId: null, log: [], result: null, error: null,
     question: null, answer: null, answeredBy: null,
-    verdict: null, verdictNote: null, verdictBy: null, ...over,
+    verdict: null, verdictNote: null, verdictBy: null,
+    proposal: null, proposalChoice: null, proposalBy: null, ...over,
   };
 }
 
@@ -57,6 +58,24 @@ test('mixed replay keeps messages unique and a task card renders the updated tas
   }));
   assert.ok(running.includes('Work in progress · 1 line'));
   assert.equal(running.includes('Accept'), false);
+  const proposal = {
+    question: 'Which store?', options: ['SQLite', 'Postgres'], pick: 'SQLite', why: 'one file, no service',
+  };
+  const proposing = renderToStaticMarkup(createElement(TaskCard, {
+    task: taskOf({ status: 'needs_input', proposal }), author: 'Moshe',
+  }));
+  assert.ok(proposing.includes('data-task-proposal'));
+  assert.ok(proposing.includes('data-proposal-option="SQLite"'));
+  assert.ok(proposing.includes('data-proposal-option="Postgres"'));
+  assert.ok(proposing.includes('agent&#x27;s pick'));
+  assert.ok(proposing.includes('Approve'));
+  assert.ok(proposing.includes('Discuss'));
+  const decided = renderToStaticMarkup(createElement(TaskCard, {
+    task: taskOf({ proposal, proposalChoice: 'Postgres', proposalBy: 'Moshe' }), author: 'Moshe',
+  }));
+  assert.ok(decided.includes('data-task-choice'));
+  assert.ok(decided.includes('Postgres by Moshe'));
+  assert.equal(decided.includes('name="approve"'), false);
 });
 
 test('replay upserts the same row and live status updates replace it', () => {

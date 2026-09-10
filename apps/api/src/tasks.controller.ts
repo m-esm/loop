@@ -29,4 +29,7 @@ export class TasksController {
     if (!isTaskVerdict(verdict)) throw new BadRequestException('Invalid verdict');
     return this.store.review(id, verdict, optionalField(body, 'note', 8000), field(body, 'reviewedBy', 100));
   }
+  @Post(':id/decide') @HttpCode(200) decide(@Param('id') id: string, @Body() body: unknown) {
+    return this.store.decide(id, field(body, 'choice', 8000), field(body, 'decidedBy', 100));
+  }
 }

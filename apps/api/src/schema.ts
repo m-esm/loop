@@ -1,5 +1,5 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
-import type { EventKind, MessageBody, TaskEvent, TaskStatus, TaskVerdict } from '@loop/types';
+import type { EventKind, MessageBody, TaskEvent, TaskProposal, TaskStatus, TaskVerdict } from '@loop/types';
 
 export const rooms = sqliteTable('rooms', { id: text('id').primaryKey() });
 
@@ -24,6 +24,9 @@ export const tasks = sqliteTable('tasks', {
   verdict: text('verdict').$type<TaskVerdict>(),
   verdictNote: text('verdict_note'),
   verdictBy: text('verdict_by'),
+  proposal: text('proposal', { mode: 'json' }).$type<TaskProposal>(),
+  proposalChoice: text('proposal_choice'),
+  proposalBy: text('proposal_by'),
 });
 export const events = sqliteTable('events', {
   id: integer('id').primaryKey({ autoIncrement: true }),

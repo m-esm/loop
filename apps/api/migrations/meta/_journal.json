@@ -7,6 +7,7 @@
     { "idx": 2, "version": "6", "when": 1789026800000, "tag": "0002_task_run", "breakpoints": true },
     { "idx": 3, "version": "6", "when": 1789030800000, "tag": "0003_task_question", "breakpoints": true },
     { "idx": 4, "version": "6", "when": 1789037022000, "tag": "0004_task_agent", "breakpoints": true },
-    { "idx": 5, "version": "6", "when": 1789041000000, "tag": "0005_task_verdict", "breakpoints": true }
+    { "idx": 5, "version": "6", "when": 1789041000000, "tag": "0005_task_verdict", "breakpoints": true },
+    { "idx": 6, "version": "6", "when": 1789044338000, "tag": "0006_task_proposal", "breakpoints": true }
   ]
 }

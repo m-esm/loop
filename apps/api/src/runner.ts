@@ -4,13 +4,14 @@ import { once } from 'node:events';
 import { tmpdir } from 'node:os';
 import { setImmediate as defer, setInterval, setTimeout, clearInterval, clearTimeout } from 'node:timers';
 import type { Readable } from 'node:stream';
-import { INITIAL_STATUS, type Task } from '@loop/types';
+import { INITIAL_STATUS, parseTaskProposal, type Task } from '@loop/types';
 import { loadAgents, type AgentConfig } from './agents';
 import { EventBus } from './bus';
 import { RunFenceError, TaskStore } from './task-store';
 
 const PROGRESS_MIN_INTERVAL_MS = 500;
 const ASK_PREFIX = 'LOOP_ASK: ';
+const PROPOSE_PREFIX = 'LOOP_PROPOSE: ';
 
 function wallMs() {
   const value = Number(process.env.LOOP_WALL_MS);
@@ -160,6 +161,22 @@ export class TaskRunner implements OnModuleInit, OnModuleDestroy {
         child?.kill('SIGKILL');
         return;
       }
+      if (line.startsWith(PROPOSE_PREFIX)) {
+        flush();
+        asked = true;
+        try {
+          const parsed = parseTaskProposal(line.slice(PROPOSE_PREFIX.length));
+          if ('error' in parsed) {
+            this.store.finish(id, runId, { status: 'failed', error: parsed.error });
+          } else {
+            this.store.propose(id, runId, parsed.proposal);
+          }
+        } catch (error) {
+          if (!(error instanceof RunFenceError)) throw error;
+        }
+        child?.kill('SIGKILL');
+        return;
+      }
       push(line, 'stdout');
     };
     const onStderr = (line: string) => push(line, 'stderr');
@@ -178,6 +195,7 @@ export class TaskRunner implements OnModuleInit, OnModuleDestroy {
       };
       if (task.answer) env.LOOP_TASK_ANSWER = task.answer;
       if (task.verdictNote) env.LOOP_TASK_NOTE = task.verdictNote;
+      if (task.proposalChoice) env.LOOP_TASK_CHOICE = task.proposalChoice;
 
       child = spawn(agent.command[0], agent.command.slice(1), {
         shell: false,
