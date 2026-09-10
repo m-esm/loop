@@ -32,7 +32,8 @@ test('service event reaches subscriber and persistence with the same id and payl
   const received: TaskEvent[] = [];
   const unsubscribe = bus.subscribe((event) => {
     assert.deepEqual(bus.since(event.id - 1)[0], event);
-    assert.deepEqual(store.get(event.task_id), event.payload.task);
+    assert.notEqual(event.kind, 'message_created');
+    if (event.kind !== 'message_created') assert.deepEqual(store.get(event.subject_id!), event.payload.task);
     received.push(event);
   });
   const task = store.create(input);
@@ -58,5 +59,5 @@ test('a broken subscriber does not block other subscribers or fail the mutation'
   const received: TaskEvent[] = [];
   bus.subscribe((event) => received.push(event));
   const task = store.create(input);
-  assert.equal(received[0].task_id, task.id);
+  assert.equal(received[0].subject_id, task.id);
 });

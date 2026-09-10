@@ -1,8 +1,11 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
-import type { EventKind, TaskEvent, TaskStatus } from '@loop/types';
+import type { EventKind, MessageBody, TaskEvent, TaskStatus } from '@loop/types';
+
+export const rooms = sqliteTable('rooms', { id: text('id').primaryKey() });
 
 export const tasks = sqliteTable('tasks', {
   id: text('id').primaryKey(),
+  roomId: text('room_id').notNull().default('default').references(() => rooms.id),
   title: text('title').notNull(),
   owner: text('owner').notNull(),
   definitionOfDone: text('definition_of_done').notNull(),
@@ -12,8 +15,16 @@ export const tasks = sqliteTable('tasks', {
 });
 export const events = sqliteTable('events', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  task_id: text('task_id').notNull().references(() => tasks.id),
+  subject_id: text('subject_id'),
+  room_id: text('room_id').notNull().references(() => rooms.id),
   ts: text('ts').notNull(),
   kind: text('kind').$type<EventKind>().notNull(),
   payload: text('payload', { mode: 'json' }).$type<TaskEvent['payload']>().notNull(),
+});
+export const messages = sqliteTable('messages', {
+  id: text('id').primaryKey(),
+  roomId: text('room_id').notNull().references(() => rooms.id),
+  author: text('author').notNull(),
+  body: text('body', { mode: 'json' }).$type<MessageBody>().notNull(),
+  createdAt: text('created_at').notNull(),
 });

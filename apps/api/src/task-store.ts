@@ -5,6 +5,7 @@ import { INITIAL_STATUS, type CreateTask, type TaskSnapshot, type TaskStatus } f
 import { Database } from './database';
 import { EventBus } from './bus';
 import { tasks } from './schema';
+import { roomId } from './field';
 
 @Injectable()
 export class TaskStore {
@@ -27,22 +28,26 @@ export class TaskStore {
   }
 
   create(input: CreateTask) {
-    return this.bus.emitEvent(() => {
+    const event = this.bus.emitEvent(() => {
       const ts = new Date().toISOString();
       const task = this.database.db.insert(tasks).values({
-        ...input, id: randomUUID(), status: INITIAL_STATUS, createdAt: ts, updatedAt: ts,
+        ...input, roomId: roomId(input.roomId ?? 'default'), id: randomUUID(), status: INITIAL_STATUS, createdAt: ts, updatedAt: ts,
       }).returning().get();
-      return { task_id: task.id, ts, kind: 'task_created', payload: { task } };
-    }).payload.task;
+      return { subject_id: task.id, room_id: task.roomId, ts, kind: 'task_created', payload: { task } };
+    });
+    if (event.kind !== 'task_created') throw new Error('Unexpected event kind');
+    return event.payload.task;
   }
 
   updateStatus(id: string, status: TaskStatus) {
-    return this.bus.emitEvent(() => {
+    const event = this.bus.emitEvent(() => {
       const previousStatus = this.get(id).status;
       const ts = new Date().toISOString();
       const task = this.database.db.update(tasks).set({ status, updatedAt: ts })
         .where(eq(tasks.id, id)).returning().get()!;
-      return { task_id: id, ts, kind: 'task_status_changed', payload: { task, previousStatus } };
-    }).payload.task;
+      return { subject_id: id, room_id: task.roomId, ts, kind: 'task_status_changed', payload: { task, previousStatus } };
+    });
+    if (event.kind !== 'task_status_changed') throw new Error('Unexpected event kind');
+    return event.payload.task;
   }
 }

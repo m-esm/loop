@@ -1,10 +1,10 @@
 import { test, expect, type BrowserContext } from '@playwright/test';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { once } from 'node:events';
-import { TASK_STATUSES, isRunningStatus, isActiveStatus, type Task, type TaskSnapshot } from '@loop/types';
+import { TASK_STATUSES, isRunningStatus, isActiveStatus, type Message, type Task, type TaskSnapshot } from '@loop/types';
 
 test('two tabs receive creates and status changes, then reconnect and replay after API restart', async ({ browser, request }) => {
   const dir = mkdtempSync(join(tmpdir(), 'loop-e2e-'));
@@ -44,6 +44,45 @@ test('two tabs receive creates and status changes, then reconnect and replay aft
     await Promise.all([tabA.goto('http://127.0.0.1:3100'), tabB.goto('http://127.0.0.1:3100')]);
     await expect(tabA.locator('[data-live]')).toHaveAttribute('data-live', '1');
     await expect(tabB.locator('[data-live]')).toHaveAttribute('data-live', '1');
+    let streamCount = 0;
+    let messagePosts = 0;
+    tabA.on('request', (req) => {
+      if (req.url().includes('/stream')) streamCount++;
+      if (req.url().endsWith('/messages') && req.method() === 'POST') messagePosts++;
+    });
+    await tabA.getByLabel('Message', { exact: true }).fill('/unknown hi');
+    await tabA.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(tabA.locator('.composer').getByRole('alert')).toContainText('Unknown command');
+    expect(messagePosts).toBe(0);
+    await tabA.getByLabel('Author', { exact: true }).fill('Moshe');
+    await tabA.getByLabel('Message', { exact: true }).fill('Hello room');
+    await tabA.getByLabel('Message', { exact: true }).press('Shift+Enter');
+    await tabA.getByLabel('Message', { exact: true }).press('Enter');
+    await expect(tabB.getByRole('log')).toContainText('Hello room');
+    await tabA.getByLabel('Message', { exact: true }).fill('/task Build the chat :: Live cards update');
+    const posted = tabA.waitForResponse((response) => response.url().endsWith('/messages') && response.request().method() === 'POST');
+    await tabA.getByLabel('Message', { exact: true }).press('Enter');
+    const cardMessage = await (await posted).json() as Message;
+    if (cardMessage.body.kind !== 'task') throw new Error('Expected task card');
+    const chatCard = tabB.locator('.chat-task');
+    await expect(chatCard).toContainText('Build the chat');
+    const chatStatus = TASK_STATUSES.find(isRunningStatus)!;
+    await request.patch(`${apiUrl}/tasks/${cardMessage.body.taskId}/status`, { data: { status: chatStatus } });
+    await expect(chatCard.locator('.tp-chip')).toHaveText(chatStatus);
+    await tabB.screenshot({ path: '/tmp/loop-chat.png' });
+    for (let i = 0; i < 14; i++) {
+      await request.post(`${apiUrl}/messages`, { data: { roomId: 'default', author: 'Human', body: `History ${i}` } });
+    }
+    const transcript = tabB.getByRole('log');
+    await expect(transcript).toContainText('History 13');
+    await expect.poll(() => transcript.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThan(80);
+    await transcript.evaluate((el) => { el.scrollTop = 0; el.dispatchEvent(new Event('scroll')); });
+    await request.post(`${apiUrl}/messages`, { data: { roomId: 'default', author: 'Human', body: 'Keep reading history' } });
+    await expect(transcript).toContainText('Keep reading history');
+    expect(await transcript.evaluate((el) => el.scrollTop)).toBe(0);
+    expect(streamCount).toBe(0);
+    await tabA.getByRole('button', { name: 'Tasks', exact: true }).click();
+    await tabB.getByRole('button', { name: 'Tasks', exact: true }).click();
     let taskReads = 0;
     const streamUrls: string[] = [];
     tabB.on('request', (req) => {
@@ -89,9 +128,9 @@ test('two tabs receive creates and status changes, then reconnect and replay aft
     await expect(row.getByText(terminal, { exact: true })).toBeVisible();
     await expect(tabB.locator('[data-live]')).toHaveAttribute('data-live', '1');
     expect(streamUrls.some((url) => url.endsWith(`since=${cursor}`))).toBe(true);
-    expect(await tabB.locator('tbody tr').count()).toBe(2);
+    expect(await tabB.locator('tbody tr').count()).toBe(3);
     expect(taskReads).toBe(0);
-    console.log(`Killed and restarted API with the same SQLite file. Reconnected using since=${cursor}; missed create and status replayed, exactly 2 rows, 0 task-list fetches.`);
+    console.log(`Killed and restarted API with the same SQLite file. Reconnected using since=${cursor}; missed create and status replayed, exactly 3 rows, 0 task-list fetches.`);
     expect(hiddenReconnects).toEqual([]);
     await tabA.evaluate(() => {
       Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
@@ -106,14 +145,13 @@ test('two tabs receive creates and status changes, then reconnect and replay aft
     expect(third.status()).toBe(201);
     const thirdTask = await third.json() as Task;
     expect((await request.patch(`${apiUrl}/tasks/${thirdTask.id}/status`, { data: { status: running } })).status()).toBe(200);
-    await expect(tabB.locator('tbody tr')).toHaveCount(3);
+    await expect(tabB.locator('tbody tr')).toHaveCount(4);
     await expect(tabB.getByRole('row').filter({ hasText: thirdTask.title }).getByText(running, { exact: true })).toBeVisible();
     await row.getByRole('button').click();
     await expect(tabB.getByRole('region', { name: 'Task detail' })).toBeVisible();
-    mkdirSync('docs/screenshots', { recursive: true });
-    await tabB.screenshot({ path: 'docs/screenshots/tasks-list.png' });
+    await tabB.screenshot({ path: '/tmp/loop-tasks-list.png' });
     expect(errors).toEqual([]);
-    console.log('Saved docs/screenshots/tasks-list.png at 1440x900 with 3 tasks in different states; no browser runtime errors.');
+    console.log('Saved /tmp/loop-chat.png and /tmp/loop-tasks-list.png at 1440x900; no browser runtime errors.');
   } finally {
     await Promise.all(contexts.map((context) => context.close()));
     await stopApi();
