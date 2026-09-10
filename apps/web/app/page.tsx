@@ -3,11 +3,11 @@ import Room from '../components/Room';
 export default function Page() {
   return <div className="shell">
     <aside className="projects" aria-label="Projects">
-      <h1>Loop</h1><p className="muted">Projects</p>
+      <p className="brand">Loop</p><p className="muted">Projects</p>
       <div id="projects-rail" />
     </aside>
     <main>
-      <header><p className="muted">Project room</p><h2>Loop</h2>
+      <header><p className="muted">Project room</p><h1>Loop</h1>
       </header>
       <Room />
     </main>

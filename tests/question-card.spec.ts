@@ -55,7 +55,6 @@ test('question card answers in the browser and the same task reaches done', asyn
     await expect(rail.locator('.needs-human-pill')).toHaveText('1');
     await expect(rail.locator('.needs-human-pill')).toHaveAttribute('aria-label', '1 task needs a human');
     await expect(page).toHaveTitle(/^\(1\) /);
-    await expect(page).toHaveTitle(/^\(1\) /);
 
     await page.getByLabel('Message', { exact: true }).fill('/task ASK: what shape :: proof');
     const secondPost = page.waitForResponse((response) => response.url().endsWith('/messages') && response.request().method() === 'POST');
@@ -96,7 +95,6 @@ test('question card answers in the browser and the same task reaches done', asyn
     expect((await answeredShape).status()).toBe(200);
     await expect(shapeCard.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
     await expect(rail).toHaveAttribute('data-needs-human', '0');
-    await expect(page).not.toHaveTitle(/^\(\d+\) /);
     await expect(rail.locator('.needs-human-pill')).toHaveCount(0);
     await expect(page).not.toHaveTitle(/^\(\d+\) /);
   } finally {
