@@ -1,6 +1,6 @@
 import {
-  BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException, OnModuleInit,
-  UnauthorizedException,
+  BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException,
+  OnModuleInit, UnauthorizedException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { and, count, eq, gt, isNull, lte } from 'drizzle-orm';
@@ -11,7 +11,9 @@ import {
   sessionCookie, sessionExpiry, verifyPassword,
 } from './auth-crypto';
 import { Database } from './database';
+import { roomSlug } from './field';
 import { syncAgentPrincipals } from './principals';
+import { syncCatalogRoomAgents } from './room-agents';
 import { credentials, invites, principals, roomMembers, rooms, sessions } from './schema';
 
 const INVITE_INVALID = 'That invite is not valid';
@@ -63,6 +65,36 @@ export class AuthService implements OnModuleInit {
   roomIds(principalId: string): string[] {
     return this.database.db.select({ roomId: roomMembers.roomId }).from(roomMembers)
       .where(eq(roomMembers.principalId, principalId)).all().map((row) => row.roomId);
+  }
+
+  listRooms(principalId: string): { id: string; name: string; role: 'owner' | 'member' }[] {
+    return this.database.db.select({
+      id: rooms.id,
+      name: rooms.name,
+      role: roomMembers.role,
+    }).from(roomMembers)
+      .innerJoin(rooms, eq(rooms.id, roomMembers.roomId))
+      .where(eq(roomMembers.principalId, principalId))
+      .all()
+      .map((row) => ({ id: row.id, name: row.name, role: row.role as 'owner' | 'member' }));
+  }
+
+  createRoom(principalId: string, name: string): { id: string; name: string; role: 'owner' } {
+    const id = roomSlug(name);
+    return this.database.sqlite.transaction(() => {
+      try {
+        this.database.db.insert(rooms).values({ id, name }).run();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        if (/unique/i.test(message)) throw new ConflictException('A room with this id already exists');
+        throw error;
+      }
+      this.database.db.insert(roomMembers).values({
+        roomId: id, principalId, role: 'owner',
+      }).run();
+      syncCatalogRoomAgents(this.database, loadAgents(), id);
+      return { id, name, role: 'owner' as const };
+    })();
   }
 
   /**

@@ -21,6 +21,21 @@ export function roomId(value: unknown): string {
   return value;
 }
 
+/** Display name to room id: lowercase, spaces to hyphen, keep [A-Za-z0-9_-]. */
+export function roomSlug(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .replace(/ /g, '-')
+    .replace(/[^a-z0-9_-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/_+/g, '_')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 100)
+    .replace(/^-+|-+$/g, '');
+  if (!slug) throw new BadRequestException('name does not yield a room id');
+  return roomId(slug);
+}
+
 export function mentionName(value: string): string {
   if (!/^[A-Za-z0-9_-]+$/.test(value)) {
     throw new BadRequestException('name must be letters, digits, hyphen, or underscore');

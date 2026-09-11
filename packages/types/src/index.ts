@@ -5,6 +5,12 @@ export * from './composer';
 export * from './proposal';
 export * from './spawn';
 
+export interface RoomSummary {
+  id: string;
+  name: string;
+  role: 'owner' | 'member';
+}
+export interface RoomsSnapshot { rooms: RoomSummary[] }
 export interface RoomAgent {
   id: string;
   roomId: string;

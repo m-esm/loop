@@ -3,7 +3,7 @@ import type { Request } from 'express';
 import { isTaskStatus, isTaskVerdict } from '@loop/types';
 import { actor, AuthService, requireHuman } from './auth';
 import { TaskStore } from './task-store';
-import { field, optionalField } from './field';
+import { field, optionalField, roomId } from './field';
 
 @Controller('tasks')
 export class TasksController {
@@ -27,11 +27,14 @@ export class TasksController {
   @Post() create(@Body() body: unknown, @Req() req: Request) {
     const principal = actor(req);
     const agentId = optionalField(body, 'agentId', 100);
+    const room = roomId(optionalField(body, 'roomId', 100) ?? 'default');
+    this.auth.membership(principal.id, room);
     return this.store.create({
       title: field(body, 'title', 200),
       owner: principal.displayName,
       ownerPrincipalId: principal.id,
       definitionOfDone: field(body, 'definitionOfDone', 8000),
+      roomId: room,
       ...(agentId ? { agentId } : {}),
     });
   }
