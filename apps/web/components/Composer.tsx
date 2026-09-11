@@ -4,7 +4,7 @@ import { useRef, useState, type FormEvent } from 'react';
 import { parseComposer } from '@loop/types';
 import { api } from '../lib/api';
 
-export default function Composer({ author }: { author: string }) {
+export default function Composer({ author, roomId }: { author: string; roomId: string }) {
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
   const sending = useRef(false);
@@ -19,7 +19,7 @@ export default function Composer({ author }: { author: string }) {
     setError('');
     try {
       await api('/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomId: 'default', body }) });
+        body: JSON.stringify({ roomId, body }) });
       setBody('');
     } catch (error) { setError(error instanceof Error ? error.message : 'Message could not be sent.'); }
     finally { sending.current = false; setBusy(false); }

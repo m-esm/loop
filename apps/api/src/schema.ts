@@ -1,7 +1,10 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 import type { EventKind, MessageBody, TaskEvent, TaskProposal, TaskStatus, TaskVerdict } from '@loop/types';
 
-export const rooms = sqliteTable('rooms', { id: text('id').primaryKey() });
+export const rooms = sqliteTable('rooms', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+});
 
 export const principals = sqliteTable('principals', {
   id: text('id').primaryKey(),

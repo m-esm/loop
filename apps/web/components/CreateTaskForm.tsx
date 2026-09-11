@@ -4,7 +4,7 @@ import { useState, type FormEvent } from 'react';
 import type { Task } from '@loop/types';
 import { api } from '../lib/api';
 
-export default function CreateTaskForm() {
+export default function CreateTaskForm({ roomId }: { roomId: string }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -16,7 +16,7 @@ export default function CreateTaskForm() {
     try {
       await api<Task>('/tasks', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(Object.fromEntries(data)),
+        body: JSON.stringify({ ...Object.fromEntries(data), roomId }),
       });
       form.reset();
     } catch (error) { setError((error as Error).message); }

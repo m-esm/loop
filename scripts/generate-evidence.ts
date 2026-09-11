@@ -269,6 +269,7 @@ function generate(): string {
     'Migration `0008_auth.sql` adds `principals`, `credentials`, `sessions`, and `room_members`, plus nullable `*_principal_id` columns next to the legacy attribution strings.',
     'Migration `0009_room_agents.sql` adds `room_agents` (catalog id, mention name, no command) unique on `(room_id, name)`, and seeds echo and reviewer into the default room.',
     'Migration `0010_invites.sql` adds `invites` (room, email, role, token hash, invited by, accepted at, expires at) unique on token hash and on pending `(room_id, email)`. An owner copies the invite link; Loop does not send email. Register accepts an optional invite token and joins that room in the same transaction that marks the invite accepted.',
+    'Migration `0012_room_name.sql` adds `rooms.name` and backfills the seeded default room as Loop. `GET /rooms` lists memberships only. `POST /rooms` inserts the room row, owner membership, and catalog agents in one transaction.',
     'A global guard requires a live `loop_session` cookie except on register, login, and health. Attribution is stamped from the session, not the request body. Agents get principals at boot and never get a session.',
     '',
   ];

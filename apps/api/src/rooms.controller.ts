@@ -12,6 +12,16 @@ export class RoomsController {
     @Inject(AuthService) private readonly auth: AuthService,
   ) {}
 
+  @Get()
+  listRooms(@Req() req: Request) {
+    return { rooms: this.auth.listRooms(actor(req).id) };
+  }
+
+  @Post()
+  createRoom(@Body() body: unknown, @Req() req: Request) {
+    return this.auth.createRoom(actor(req).id, field(body, 'name', 100));
+  }
+
   @Get(':room/agents')
   list(@Param('room') roomParam: string, @Req() req: Request) {
     const room = roomId(roomParam);

@@ -7,7 +7,7 @@ export default function Page() {
       <div id="projects-rail" />
     </aside>
     <main>
-      <header><p className="muted">Project room</p><h1>Loop</h1>
+      <header><p className="muted">Project room</p><h1 id="room-heading">Loop</h1>
       </header>
       <Room />
     </main>

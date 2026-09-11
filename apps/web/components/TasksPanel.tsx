@@ -6,13 +6,13 @@ import { chipClass, isActiveStatus, type Task } from '@loop/types';
 import { actorLabel } from '../lib/api';
 import CreateTaskForm from './CreateTaskForm';
 
-export default function TasksPanel({ tasks }: { tasks: Task[] }) {
+export default function TasksPanel({ tasks, room }: { tasks: Task[]; room: string }) {
   const [selected, setSelected] = useState<string | null>(null);
   const detail = tasks.find((task) => task.id === selected);
   return <section aria-label="Tasks">
     <div className="task-heading"><h3>Tasks</h3>
     </div>
-    <CreateTaskForm />
+    <CreateTaskForm roomId={room} />
     <div className="table-wrap"><table>
       <thead><tr><th>Task</th><th>Owner</th><th>State</th></tr></thead>
       <tbody>{tasks.map((task) => <tr key={task.id} data-task-id={task.id}>

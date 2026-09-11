@@ -17,17 +17,17 @@ export function listRoomAgents(database: Database, room: string): RoomAgent[] {
     .orderBy(asc(roomAgents.createdAt), asc(roomAgents.id)).all();
 }
 
-/** Register catalog entries in the default room so a custom agents.json still has a mention. */
-export function syncCatalogRoomAgents(database: Database, agents: AgentConfig[]) {
+/** Register catalog entries in a room so a custom agents.json still has a mention. */
+export function syncCatalogRoomAgents(database: Database, agents: AgentConfig[], room = 'default') {
   const ts = new Date().toISOString();
-  const existing = listRoomAgents(database, 'default');
+  const existing = listRoomAgents(database, room);
   const byCatalog = new Set(existing.map((row) => row.catalogId));
   const names = new Set(existing.map((row) => row.name));
   for (const agent of agents) {
     if (byCatalog.has(agent.id) || names.has(agent.id)) continue;
     database.db.insert(roomAgents).values({
       id: randomUUID(),
-      roomId: 'default',
+      roomId: room,
       catalogId: agent.id,
       name: agent.id,
       createdBy: 'catalog',

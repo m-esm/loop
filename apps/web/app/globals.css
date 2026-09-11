@@ -62,12 +62,38 @@ th, td { padding: 14px 8px; border-bottom: 1px solid #e2e6eb; vertical-align: to
   padding: 14px;
   border-radius: 6px;
 }
-#projects-rail a {
+#projects-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+#projects-rail button[data-room] {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  text-decoration: none;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+#projects-rail button[data-room][aria-current="page"] {
+  background: #253c55;
+  color: #fff;
+}
+#projects-rail form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  padding: 8px 0 0;
+  margin: 0;
+  background: none;
+  border: 0;
+}
+#projects-rail form button[type="submit"] {
+  justify-self: start;
 }
 .room-tab {
   display: inline-flex;
