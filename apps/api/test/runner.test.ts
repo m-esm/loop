@@ -368,10 +368,13 @@ test('rejected rerun passes LOOP_TASK_NOTE to the child', async () => {
   runner.start();
   await waitFor(() => store.get(task.id).status === 'done');
   assert.equal(store.get(task.id).result, 'first');
+  assert.ok(store.get(task.id).log.includes('first'));
   store.review(task.id, 'rejected', 'too thin', 'Moshe');
   await waitFor(() => store.get(task.id).status === 'done' && store.get(task.id).result === 'note too thin');
   const done = store.get(task.id);
   assert.equal(done.result, 'note too thin');
+  assert.equal(done.log.includes('first'), false);
+  assert.ok(done.log.includes('note too thin'));
   // The re-run is a new unreviewed result, so the verdict that sent it back is
   // gone. A surviving verdict would hide Accept/Reject on the fresh output.
   assert.equal(done.verdict, null);
