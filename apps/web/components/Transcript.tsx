@@ -4,9 +4,10 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 import { isActiveStatus, type Message, type RoomFile, type Task } from '@loop/types';
 import MessageCard from './MessageCard';
 
-export default function Transcript({ messages, tasks, files = [], onOpenThread }: {
+export default function Transcript({ messages, tasks, files = [], onOpenThread, onOpenArtifact }: {
   messages: Message[]; tasks: Task[]; files?: RoomFile[];
   onOpenThread?: (id: string) => void;
+  onOpenArtifact?: (file: RoomFile) => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
@@ -65,6 +66,6 @@ export default function Transcript({ messages, tasks, files = [], onOpenThread }
       file={message.body.kind === 'file' ? filesById.get(message.body.fileId) : undefined}
       replyCount={replyCounts.get(message.id) ?? 0}
       participants={replyAuthors.get(message.id) ?? []}
-      onOpenThread={onOpenThread} />)}
+      onOpenThread={onOpenThread} onOpenArtifact={onOpenArtifact} />)}
   </div>;
 }

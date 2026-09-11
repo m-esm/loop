@@ -17,9 +17,9 @@ import LoginForm from './LoginForm';
 import ProjectsRailEntry from './ProjectsRailEntry';
 import RoomAgents, { AgentProfile } from './RoomAgents';
 import Team from './Team';
-import FilesPanel from './FilesPanel';
+import FilesPanel, { ArtifactPreview } from './FilesPanel';
 
-type InspectorKind = 'closed' | 'task' | 'team' | 'agents' | 'agent' | 'thread';
+type InspectorKind = 'closed' | 'task' | 'team' | 'agents' | 'agent' | 'thread' | 'artifact';
 
 function relatedTask(message: Message, tasks: Task[]): Task | undefined {
   if (message.body.kind !== 'task') return undefined;
@@ -77,6 +77,7 @@ export default function Room() {
   const [inspectTaskId, setInspectTaskId] = useState<string | null>(null);
   const [inspectThreadId, setInspectThreadId] = useState<string | null>(null);
   const [inspectAgent, setInspectAgent] = useState<RoomAgent | null>(null);
+  const [inspectFileId, setInspectFileId] = useState<string | null>(null);
   const [inspectorHost, setInspectorHost] = useState<HTMLElement | null>(null);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -97,6 +98,7 @@ export default function Room() {
     setInspectTaskId(null);
     setInspectThreadId(null);
     setInspectAgent(null);
+    setInspectFileId(null);
     setAuthReady(true);
   }
   useEffect(() => {
@@ -174,25 +176,36 @@ export default function Room() {
     setInspectTaskId(null);
     setInspectThreadId(null);
     setInspectAgent(null);
-    setInspector((kind) => (kind === 'task' || kind === 'thread' || kind === 'agent' ? 'closed' : kind));
+    setInspectFileId(null);
+    setInspector((kind) => (kind === 'task' || kind === 'thread' || kind === 'agent' || kind === 'artifact' ? 'closed' : kind));
   }, [selected]);
   function openThread(id: string) {
     setInspectThreadId(id);
     setInspectTaskId(null);
     setInspectAgent(null);
+    setInspectFileId(null);
     setInspector('thread');
   }
   function openAgent(agent: RoomAgent) {
     setInspectAgent(agent);
     setInspectTaskId(null);
     setInspectThreadId(null);
+    setInspectFileId(null);
     setInspector('agent');
+  }
+  function openArtifact(file: RoomFile) {
+    setInspectFileId(file.id);
+    setInspectTaskId(null);
+    setInspectThreadId(null);
+    setInspectAgent(null);
+    setInspector('artifact');
   }
   function setInspectorKind(kind: InspectorKind) {
     setInspector(kind);
     if (kind !== 'thread') setInspectThreadId(null);
     if (kind !== 'task') setInspectTaskId(null);
     if (kind !== 'agent') setInspectAgent(null);
+    if (kind !== 'artifact') setInspectFileId(null);
   }
   async function logout() {
     try { await api('/auth/logout', { method: 'POST' }); } catch { /* cookie is cleared server-side even if this races */ }
@@ -235,13 +248,15 @@ export default function Room() {
       author={me.displayName}
       task={state.tasks.find((row) => row.id === inspectTaskId)}
       agent={inspectAgent}
+      file={files.find((row) => row.id === inspectFileId)}
       threadRoot={state.messages.find((row) => row.id === inspectThreadId)}
       threadMessages={state.messages.filter((row) => row.id === inspectThreadId || row.parentId === inspectThreadId)}
       tasks={state.tasks}
       files={files}
       onKind={setInspectorKind}
       onSelectAgent={openAgent}
-      onClose={() => { setInspector('closed'); setInspectTaskId(null); setInspectThreadId(null); setInspectAgent(null); }}
+      onOpenArtifact={openArtifact}
+      onClose={() => { setInspector('closed'); setInspectTaskId(null); setInspectThreadId(null); setInspectAgent(null); setInspectFileId(null); }}
     />}
     <nav aria-label="Room views">
       <span className="room-tab">
@@ -273,21 +288,21 @@ export default function Room() {
     {error && <p role="alert">{error} <button onClick={() => setAttempt((value) => value + 1)}>Retry</button></p>}
     {!cursors && !error && me && <p>Loading room...</p>}
     {cursors && me && (view === 'chat' ? <section aria-label="Chat">
-      <Transcript tasks={state.tasks} messages={state.messages} files={files} onOpenThread={openThread} />
+      <Transcript tasks={state.tasks} messages={state.messages} files={files} onOpenThread={openThread} onOpenArtifact={openArtifact} />
       <Composer author={me.displayName} roomId={selected} />
     </section> : view === 'tasks' ? <TasksPanel
       tasks={state.tasks}
       room={selected}
       onSelectTask={(id) => { setInspectTaskId(id); setInspectorKind('task'); }}
     />
-      : <FilesPanel room={selected} files={files} onChange={() => {
+      : <FilesPanel room={selected} files={files} onSelectFile={openArtifact} onChange={() => {
         void api<RoomFilesSnapshot>(`/rooms/${encodeURIComponent(selected)}/files`).then((snapshot) => setFiles(snapshot.files)).catch((err: Error) => setError(err.message));
       }} />)}
   </>;
 }
 
 function Inspector({
-  host, kind, room, roomName, author, task, agent, threadRoot, threadMessages, tasks, files, onKind, onSelectAgent, onClose,
+  host, kind, room, roomName, author, task, agent, file, threadRoot, threadMessages, tasks, files, onKind, onSelectAgent, onOpenArtifact, onClose,
 }: {
   host: HTMLElement;
   kind: InspectorKind;
@@ -296,12 +311,14 @@ function Inspector({
   author: string;
   task: Task | undefined;
   agent: RoomAgent | null;
+  file: RoomFile | undefined;
   threadRoot: Message | undefined;
   threadMessages: Message[];
   tasks: Task[];
   files: RoomFile[];
   onKind: (kind: InspectorKind) => void;
   onSelectAgent: (agent: RoomAgent) => void;
+  onOpenArtifact: (file: RoomFile) => void;
   onClose: () => void;
 }) {
   const open = kind !== 'closed';
@@ -310,8 +327,9 @@ function Inspector({
   const title = kind === 'task' ? (task?.title ?? 'Task')
     : kind === 'thread' ? threadTitle(threadRoot, threadTask, threadFile)
       : kind === 'agent' ? (agent?.name ?? 'Agent')
-        : kind === 'closed' ? '' : roomName;
-  const kindLabel = kind === 'task' ? 'Task' : kind === 'team' ? 'Team' : kind === 'agents' ? 'Agents' : kind === 'thread' ? 'THREAD' : kind === 'agent' ? 'AGENT' : '';
+        : kind === 'artifact' ? (file?.name ?? 'File')
+          : kind === 'closed' ? '' : roomName;
+  const kindLabel = kind === 'task' ? 'Task' : kind === 'team' ? 'Team' : kind === 'agents' ? 'Agents' : kind === 'thread' ? 'THREAD' : kind === 'agent' ? 'AGENT' : kind === 'artifact' ? 'FILE' : '';
   return createPortal(
     <div className="inspector" data-inspector={kind}>
       {open && <div className="inspector-head">
@@ -337,9 +355,13 @@ function Inspector({
         {kind === 'thread' && threadRoot && <div className="inspector-thread">
           {threadMessages.map((message) => <MessageCard key={message.id} message={message} tasks={tasks}
             task={relatedTask(message, tasks)}
-            file={relatedFile(message, files)} />)}
+            file={relatedFile(message, files)}
+            onOpenArtifact={onOpenArtifact} />)}
           <Composer author={author} roomId={room} parentId={threadRoot.id} fieldId="thread-reply" label="Reply" />
         </div>}
+        {kind === 'artifact' && (file
+          ? <ArtifactPreview file={file} />
+          : <p className="inspector-empty">Select a file to preview.</p>)}
       </div>
     </div>,
     host,

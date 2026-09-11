@@ -13,9 +13,10 @@ function initials(name: string): string {
     .map((word) => word[0]!.toUpperCase()).join('');
 }
 
-export default function MessageCard({ message, task, file, tasks = [], replyCount = 0, participants = [], onOpenThread }: {
+export default function MessageCard({ message, task, file, tasks = [], replyCount = 0, participants = [], onOpenThread, onOpenArtifact }: {
   message: Message; task?: Task; file?: RoomFile; tasks?: Task[];
   replyCount?: number; participants?: string[]; onOpenThread?: (id: string) => void;
+  onOpenArtifact?: (file: RoomFile) => void;
 }) {
   const countLabel = replyCount === 1 ? '1 reply' : `${replyCount} replies`;
   const visible = participants.slice(0, 3);
@@ -26,7 +27,9 @@ export default function MessageCard({ message, task, file, tasks = [], replyCoun
       : message.body.kind === 'task'
         ? (task ? <TaskCard task={task} tasks={tasks} /> : <p>Loading task...</p>)
         : (file ? <div className="file-card" data-file-id={file.id}>
-          <p data-file-name>{file.name}</p>
+          {onOpenArtifact
+            ? <button type="button" className="task-title" data-file-name onClick={() => onOpenArtifact(file)}>{file.name}</button>
+            : <p data-file-name>{file.name}</p>}
           <p className="muted" data-file-size>{formatSize(file.size)}</p>
           <a href={`${API_URL}/rooms/${file.roomId}/files/${file.id}/content`} download={file.name}>Download</a>
         </div> : <p>Loading file...</p>)}
