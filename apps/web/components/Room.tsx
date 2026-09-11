@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  isActiveStatus, type Message, type MessageSnapshot, type RoomFile, type RoomFilesSnapshot,
+  isActiveStatus, type Message, type MessageSnapshot, type RoomAgent, type RoomFile, type RoomFilesSnapshot,
   type RoomsSnapshot, type RoomSummary, type Task, type TaskSnapshot,
 } from '@loop/types';
 import { api, ApiError, type Me } from '../lib/api';
@@ -15,11 +15,11 @@ import Composer from './Composer';
 import MessageCard from './MessageCard';
 import LoginForm from './LoginForm';
 import ProjectsRailEntry from './ProjectsRailEntry';
-import RoomAgents from './RoomAgents';
+import RoomAgents, { AgentProfile } from './RoomAgents';
 import Team from './Team';
 import FilesPanel from './FilesPanel';
 
-type InspectorKind = 'closed' | 'task' | 'team' | 'agents' | 'thread';
+type InspectorKind = 'closed' | 'task' | 'team' | 'agents' | 'agent' | 'thread';
 
 function relatedTask(message: Message, tasks: Task[]): Task | undefined {
   if (message.body.kind !== 'task') return undefined;
@@ -76,6 +76,7 @@ export default function Room() {
   const [inspector, setInspector] = useState<InspectorKind>('closed');
   const [inspectTaskId, setInspectTaskId] = useState<string | null>(null);
   const [inspectThreadId, setInspectThreadId] = useState<string | null>(null);
+  const [inspectAgent, setInspectAgent] = useState<RoomAgent | null>(null);
   const [inspectorHost, setInspectorHost] = useState<HTMLElement | null>(null);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -95,6 +96,7 @@ export default function Room() {
     setInspector('closed');
     setInspectTaskId(null);
     setInspectThreadId(null);
+    setInspectAgent(null);
     setAuthReady(true);
   }
   useEffect(() => {
@@ -171,17 +173,26 @@ export default function Room() {
   useEffect(() => {
     setInspectTaskId(null);
     setInspectThreadId(null);
-    setInspector((kind) => (kind === 'task' || kind === 'thread' ? 'closed' : kind));
+    setInspectAgent(null);
+    setInspector((kind) => (kind === 'task' || kind === 'thread' || kind === 'agent' ? 'closed' : kind));
   }, [selected]);
   function openThread(id: string) {
     setInspectThreadId(id);
     setInspectTaskId(null);
+    setInspectAgent(null);
     setInspector('thread');
+  }
+  function openAgent(agent: RoomAgent) {
+    setInspectAgent(agent);
+    setInspectTaskId(null);
+    setInspectThreadId(null);
+    setInspector('agent');
   }
   function setInspectorKind(kind: InspectorKind) {
     setInspector(kind);
     if (kind !== 'thread') setInspectThreadId(null);
     if (kind !== 'task') setInspectTaskId(null);
+    if (kind !== 'agent') setInspectAgent(null);
   }
   async function logout() {
     try { await api('/auth/logout', { method: 'POST' }); } catch { /* cookie is cleared server-side even if this races */ }
@@ -223,12 +234,14 @@ export default function Room() {
       roomName={selectedName}
       author={me.displayName}
       task={state.tasks.find((row) => row.id === inspectTaskId)}
+      agent={inspectAgent}
       threadRoot={state.messages.find((row) => row.id === inspectThreadId)}
       threadMessages={state.messages.filter((row) => row.id === inspectThreadId || row.parentId === inspectThreadId)}
       tasks={state.tasks}
       files={files}
       onKind={setInspectorKind}
-      onClose={() => { setInspector('closed'); setInspectTaskId(null); setInspectThreadId(null); }}
+      onSelectAgent={openAgent}
+      onClose={() => { setInspector('closed'); setInspectTaskId(null); setInspectThreadId(null); setInspectAgent(null); }}
     />}
     <nav aria-label="Room views">
       <span className="room-tab">
@@ -274,7 +287,7 @@ export default function Room() {
 }
 
 function Inspector({
-  host, kind, room, roomName, author, task, threadRoot, threadMessages, tasks, files, onKind, onClose,
+  host, kind, room, roomName, author, task, agent, threadRoot, threadMessages, tasks, files, onKind, onSelectAgent, onClose,
 }: {
   host: HTMLElement;
   kind: InspectorKind;
@@ -282,11 +295,13 @@ function Inspector({
   roomName: string;
   author: string;
   task: Task | undefined;
+  agent: RoomAgent | null;
   threadRoot: Message | undefined;
   threadMessages: Message[];
   tasks: Task[];
   files: RoomFile[];
   onKind: (kind: InspectorKind) => void;
+  onSelectAgent: (agent: RoomAgent) => void;
   onClose: () => void;
 }) {
   const open = kind !== 'closed';
@@ -294,8 +309,9 @@ function Inspector({
   const threadFile = threadRoot ? relatedFile(threadRoot, files) : undefined;
   const title = kind === 'task' ? (task?.title ?? 'Task')
     : kind === 'thread' ? threadTitle(threadRoot, threadTask, threadFile)
-      : kind === 'closed' ? '' : roomName;
-  const kindLabel = kind === 'task' ? 'Task' : kind === 'team' ? 'Team' : kind === 'agents' ? 'Agents' : kind === 'thread' ? 'THREAD' : '';
+      : kind === 'agent' ? (agent?.name ?? 'Agent')
+        : kind === 'closed' ? '' : roomName;
+  const kindLabel = kind === 'task' ? 'Task' : kind === 'team' ? 'Team' : kind === 'agents' ? 'Agents' : kind === 'thread' ? 'THREAD' : kind === 'agent' ? 'AGENT' : '';
   return createPortal(
     <div className="inspector" data-inspector={kind}>
       {open && <div className="inspector-head">
@@ -314,7 +330,10 @@ function Inspector({
           ? <TaskDetail task={task} />
           : <p className="inspector-empty">Select a task to see its owner and definition of done.</p>)}
         {kind === 'team' && <Team room={room} />}
-        {kind === 'agents' && <RoomAgents room={room} />}
+        {kind === 'agents' && <RoomAgents room={room} onSelectAgent={onSelectAgent} />}
+        {kind === 'agent' && (agent
+          ? <AgentProfile agent={agent} />
+          : <p className="inspector-empty">Select an agent to see its profile.</p>)}
         {kind === 'thread' && threadRoot && <div className="inspector-thread">
           {threadMessages.map((message) => <MessageCard key={message.id} message={message} tasks={tasks}
             task={relatedTask(message, tasks)}

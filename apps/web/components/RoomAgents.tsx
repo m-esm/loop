@@ -4,7 +4,21 @@ import { useEffect, useState, type FormEvent } from 'react';
 import type { RoomAgent, RoomAgentsSnapshot } from '@loop/types';
 import { api } from '../lib/api';
 
-export default function RoomAgents({ room }: { room: string }) {
+export function AgentProfile({ agent }: { agent: RoomAgent }) {
+  return (
+    <section className="task-detail" aria-label="Agent profile">
+      <p>@{agent.name}</p>
+      <p className="muted">{agent.catalogId}</p>
+    </section>
+  );
+}
+
+export default function RoomAgents({
+  room, onSelectAgent,
+}: {
+  room: string;
+  onSelectAgent: (agent: RoomAgent) => void;
+}) {
   const [snapshot, setSnapshot] = useState<RoomAgentsSnapshot | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -58,7 +72,7 @@ export default function RoomAgents({ room }: { room: string }) {
       {snapshot.agents.length === 0
         ? <p className="muted">No agents in this room.</p>
         : <ul>{snapshot.agents.map((agent) => <li key={agent.id}>
-          <span>@{agent.name}</span>
+          <button type="button" className="task-title" onClick={() => onSelectAgent(agent)}>@{agent.name}</button>
           <span className="muted">{agent.catalogId}</span>
           {owner
             ? <button type="button" disabled={busy} onClick={() => { void remove(agent.id); }}>Remove</button>
