@@ -53,7 +53,10 @@ export default function Team({ room }: { room: string }) {
         body: JSON.stringify({ email: data.get('email'), role: data.get('role') }),
       });
       form.reset();
-      setLink(`${window.location.origin}/?invite=${created.token}`);
+      const inviteUrl = new URL('/', window.location.origin);
+      inviteUrl.searchParams.set('room', room);
+      inviteUrl.searchParams.set('invite', created.token);
+      setLink(inviteUrl.toString());
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invite could not be created.');
