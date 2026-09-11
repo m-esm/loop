@@ -17,6 +17,29 @@ import RoomAgents from './RoomAgents';
 import Team from './Team';
 import FilesPanel from './FilesPanel';
 
+const ROOM_ID = /^[A-Za-z0-9_-]+$/;
+
+function queryRoom(): string | null {
+  const value = new URLSearchParams(window.location.search).get('room');
+  if (!value || value.length > 100 || !ROOM_ID.test(value)) return null;
+  return value;
+}
+
+function writeRoomQuery(id: string, mode: 'push' | 'replace') {
+  const url = new URL(window.location.href);
+  url.searchParams.set('room', id);
+  const next = `${url.pathname}${url.search}${url.hash}`;
+  const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (next === current) return;
+  if (mode === 'push') window.history.pushState(null, '', next);
+  else window.history.replaceState(null, '', next);
+}
+
+function membershipRoom(rooms: RoomSummary[], wanted: string | null): string {
+  if (wanted && rooms.some((room) => room.id === wanted)) return wanted;
+  return rooms.find((room) => room.id === 'default')?.id ?? rooms[0]?.id ?? 'default';
+}
+
 export default function Room() {
   const [me, setMe] = useState<Me | null>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -60,11 +83,13 @@ export default function Room() {
   useEffect(() => {
     if (!me) return;
     const controller = new AbortController();
+    const wanted = queryRoom();
+    if (wanted) setSelected(wanted);
     api<RoomsSnapshot>('/rooms', { signal: controller.signal }).then((listed) => {
       setRooms(listed.rooms);
-      setSelected((current) => listed.rooms.some((room) => room.id === current)
-        ? current
-        : (listed.rooms.find((room) => room.id === 'default')?.id ?? listed.rooms[0]?.id ?? current));
+      const next = membershipRoom(listed.rooms, wanted);
+      setSelected(next);
+      writeRoomQuery(next, 'replace');
       setError('');
     }).catch((error: Error) => {
       if (controller.signal.aborted) return;
@@ -73,6 +98,14 @@ export default function Room() {
     });
     return () => controller.abort();
   }, [me, attempt]);
+  useEffect(() => {
+    function onPop() {
+      const wanted = queryRoom();
+      setSelected((current) => rooms ? membershipRoom(rooms, wanted) : (wanted ?? current));
+    }
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [rooms]);
   useEffect(() => {
     if (!me || rooms === null) return;
     if (!rooms.some((room) => room.id === selected)) return;
@@ -119,6 +152,11 @@ export default function Room() {
       return [...current, created];
     });
     setSelected(created.id);
+    writeRoomQuery(created.id, 'push');
+  }
+  function selectRoom(id: string) {
+    setSelected(id);
+    writeRoomQuery(id, 'push');
   }
   if (!authReady) return <p>Loading room...</p>;
   if (!me) return <LoginForm onAuthed={(value) => { setMe(value); setAuthReady(true); }} />;
@@ -128,7 +166,7 @@ export default function Room() {
       count={needsHumanCount(state.tasks)}
       rooms={rooms ?? []}
       selected={selected}
-      onSelect={setSelected}
+      onSelect={selectRoom}
       onCreate={createRoom}
     />
     <Team room={selected} />

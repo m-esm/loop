@@ -21,6 +21,9 @@ test('owner invites, invitee registers with the token, lands as a member of that
     const page = await context.newPage();
     await page.goto('http://127.0.0.1:3100');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
+    await page.getByLabel('Project name').fill('Klonk');
+    await page.getByRole('button', { name: 'New project' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Klonk' })).toBeVisible();
     const form = page.getByRole('form', { name: 'Invite to room' });
     await expect(form).toBeVisible();
     await form.getByLabel('Email').fill('ada@x.com');
@@ -33,7 +36,9 @@ test('owner invites, invitee registers with the token, lands as a member of that
     await expect(form.getByRole('button', { name: 'Invite' })).toBeInViewport({ ratio: 1 });
     await page.screenshot({ path: 'docs/screenshots/team.png' });
     const link = await page.getByLabel('Invite link').inputValue();
-    const inviteToken = new URL(link).searchParams.get('invite');
+    const parsed = new URL(link);
+    expect(parsed.searchParams.get('room')).toBe('klonk');
+    const inviteToken = parsed.searchParams.get('invite');
     if (!inviteToken) throw new Error('expected invite token in link');
 
     const inviteeContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -46,6 +51,9 @@ test('owner invites, invitee registers with the token, lands as a member of that
     await register.getByLabel('Password').fill('password1');
     await register.getByRole('button', { name: 'Create account' }).click();
     await expect(inviteePage.locator('[data-live]')).toHaveAttribute('data-live', '1');
+    await expect(inviteePage.getByRole('heading', { level: 1, name: 'Klonk' })).toBeVisible();
+    await expect(inviteePage.getByRole('button', { name: 'Klonk' })).toHaveAttribute('aria-current', 'page');
+    await expect(inviteePage.getByRole('heading', { level: 1, name: 'Loop' })).toHaveCount(0);
     await inviteePage.getByLabel('Message', { exact: true }).fill('hello from invitee');
     await inviteePage.getByRole('button', { name: 'Send' }).click();
     await expect(inviteePage.locator('.message-card').filter({ hasText: 'hello from invitee' })).toBeVisible();

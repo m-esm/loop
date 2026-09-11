@@ -75,6 +75,7 @@ test('a message posted in one room does not appear in another', async ({ browser
     await page.getByLabel('Project name').fill('Klonk');
     await page.getByRole('button', { name: 'New project' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Klonk' })).toBeVisible();
+    await expect(page).toHaveURL(/[?&]room=klonk(?:&|$)/);
     await expect(page.getByRole('button', { name: 'Klonk' })).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('button', { name: 'Loop' })).toHaveCount(1);
     await expect(page.getByRole('button', { name: 'Klonk' })).toHaveCount(1);
@@ -88,9 +89,60 @@ test('a message posted in one room does not appear in another', async ({ browser
     await page.screenshot({ path: resolve('docs/screenshots/projects-rail.png') });
     await page.getByRole('button', { name: 'Loop' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Loop' })).toBeVisible();
+    await expect(page).toHaveURL(/[?&]room=default(?:&|$)/);
     await expect(page.locator('.message-card').filter({ hasText: 'only in klonk' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Klonk' }).click();
+    await expect(page).toHaveURL(/[?&]room=klonk(?:&|$)/);
     await expect(page.locator('.message-card').filter({ hasText: 'only in klonk' })).toBeVisible();
+  } finally {
+    await Promise.all(contexts.map((item) => item.close()));
+    await stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the open room follows ?room=: create, reload, second tab, and unknown id', async ({ browser, request: raw }) => {
+  const dir = mkdtempSync(join(tmpdir(), 'loop-rooms-url-'));
+  const session = seedSession(join(dir, 'loop.sqlite'));
+  const request = withAuth(raw, session.token);
+  writeFileSync(join(dir, 'agents.json'), JSON.stringify({ agents: [] }));
+  const { stop } = await startApi(dir, request);
+  const contexts: BrowserContext[] = [];
+  try {
+    const context = await authedContext(browser, session.token);
+    contexts.push(context);
+    const page = await context.newPage();
+    await page.goto('http://127.0.0.1:3100');
+    await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
+    await page.getByLabel('Project name').fill('Klonk');
+    await page.getByRole('button', { name: 'New project' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Klonk' })).toBeVisible();
+    await expect(page).toHaveURL(/[?&]room=klonk(?:&|$)/);
+    await page.reload();
+    await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
+    await expect(page.getByRole('heading', { level: 1, name: 'Klonk' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Klonk' })).toHaveAttribute('aria-current', 'page');
+    await expect(page).toHaveURL(/[?&]room=klonk(?:&|$)/);
+
+    const tab = await context.newPage();
+    await tab.goto('http://127.0.0.1:3100/?room=klonk');
+    await expect(tab.locator('[data-live]')).toHaveAttribute('data-live', '1');
+    await expect(tab.getByRole('heading', { level: 1, name: 'Klonk' })).toBeVisible();
+    await expect(tab.getByRole('button', { name: 'Klonk' })).toHaveAttribute('aria-current', 'page');
+
+    await page.goto('http://127.0.0.1:3100/?room=nope');
+    await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
+    await expect(page.getByRole('heading', { level: 1, name: 'Loop' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Loop' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('heading', { level: 1 })).not.toHaveText('nope');
+
+    await page.goto('http://127.0.0.1:3100/?room=klonk');
+    await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
+    await expect(page.getByRole('heading', { level: 1, name: 'Klonk' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Klonk' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('button', { name: 'Klonk' })).toBeInViewport({ ratio: 1 });
+    expect(page.url()).toMatch(/[?&]room=klonk(?:&|$)/);
+    await page.screenshot({ path: resolve('docs/screenshots/room-url.png') });
   } finally {
     await Promise.all(contexts.map((item) => item.close()));
     await stop();
