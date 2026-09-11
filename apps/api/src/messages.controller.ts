@@ -27,11 +27,14 @@ export class MessagesController {
     const principal = actor(req);
     const room = roomId(field(body, 'roomId', 100));
     this.inRoom(req, room);
+    const rawParent = body && typeof body === 'object' ? (body as Record<string, unknown>).parentId : undefined;
+    const parentId = rawParent === undefined || rawParent === null ? null : field(body, 'parentId', 100);
     return this.store.create({
       roomId: room,
       author: principal.displayName,
       authorPrincipalId: principal.id,
       body: field(body, 'body', 8000),
+      parentId,
     });
   }
 }

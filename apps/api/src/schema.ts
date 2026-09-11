@@ -101,6 +101,7 @@ export const messages = sqliteTable('messages', {
   authorPrincipalId: text('author_principal_id').references(() => principals.id),
   body: text('body', { mode: 'json' }).$type<MessageBody>().notNull(),
   createdAt: text('created_at').notNull(),
+  parentId: text('parent_id'),
 });
 export const files = sqliteTable('files', {
   id: text('id').primaryKey(),

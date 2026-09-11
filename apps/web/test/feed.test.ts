@@ -22,7 +22,7 @@ test('mixed replay keeps messages unique and a task card renders the updated tas
   const task: Task = taskOf();
   const created: TaskEvent = { id: 1, room_id: 'default', subject_id: task.id, ts: '', kind: 'task_created', payload: { task } };
   const card: TaskEvent = { id: 2, room_id: 'default', subject_id: 'card', ts: '', kind: 'message_created', payload: {
-    message: { id: 'card', roomId: 'default', author: 'Human', authorPrincipalId: 'human-1', body: { kind: 'task', taskId: task.id }, createdAt: '' },
+    message: { id: 'card', roomId: 'default', author: 'Human', authorPrincipalId: 'human-1', body: { kind: 'task', taskId: task.id }, createdAt: '', parentId: null },
   } };
   const text: TaskEvent = { ...card, id: 3, subject_id: 'text', payload: { message: { ...card.payload.message, id: 'text', body: { kind: 'text', text: 'Hello' } } } };
   const before = [created, card, text, card].reduce(applyTaskEvent, { tasks: [], messages: [] });
@@ -38,7 +38,7 @@ test('mixed replay keeps messages unique and a task card renders the updated tas
   const fileHtml = renderToStaticMarkup(createElement(MessageCard, {
     message: {
       id: 'file-card', roomId: 'default', author: 'Human', authorPrincipalId: 'human-1',
-      body: { kind: 'file', fileId: 'file-1' }, createdAt: '',
+      body: { kind: 'file', fileId: 'file-1' }, createdAt: '', parentId: null,
     },
     file: {
       id: 'file-1', roomId: 'default', name: 'notes.txt', size: 12, contentType: 'text/plain',
@@ -126,7 +126,7 @@ test('task_progress upserts the live log without adding a row', () => {
   assert.deepEqual(after.tasks[0].log, ['Echo started']);
   assert.equal(after.tasks[0].status, 'running');
   const html = renderToStaticMarkup(createElement(MessageCard, {
-    message: { id: 'card', roomId: 'default', author: 'Human', authorPrincipalId: 'human-1', body: { kind: 'task', taskId: task.id }, createdAt: '' },
+    message: { id: 'card', roomId: 'default', author: 'Human', authorPrincipalId: 'human-1', body: { kind: 'task', taskId: task.id }, createdAt: '', parentId: null },
     task: { ...after.tasks[0], status: 'done', result: 'Echo: Build', log: ['Echo started', 'Echo finished'] },
   }));
   assert.ok(html.includes('Echo started'));
