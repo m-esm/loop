@@ -67,7 +67,28 @@ th, td { padding: 14px 8px; border-bottom: 1px solid #e2e6eb; vertical-align: to
 .message-body { white-space: pre-wrap; margin-bottom: 0; }
 .message-thread { display: flex; gap: 10px; align-items: center; margin-top: 10px; }
 .message-thread button { font-size: 13px; padding: 4px 10px; }
-.message-thread .reply-count { border: 0; background: none; padding: 0; color: #616975; }
+.message-thread .thread-summary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 0;
+  background: none;
+  color: #616975;
+}
+.participant {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #253c55;
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+}
 .inspector-thread { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
 .inspector-thread .composer { margin-bottom: 0; padding: 12px; }
 .chat-task { border-left: 3px solid #253c55; padding-left: 14px; }

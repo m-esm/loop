@@ -44,9 +44,15 @@ export default function Transcript({ messages, tasks, files = [], onOpenThread }
   const filesById = new Map(files.map((file) => [file.id, file]));
   const roots = messages.filter((message) => message.parentId == null);
   const replyCounts = new Map<string, number>();
+  const replyAuthors = new Map<string, string[]>();
   for (const message of messages) {
     if (!message.parentId) continue;
     replyCounts.set(message.parentId, (replyCounts.get(message.parentId) ?? 0) + 1);
+    const authors = replyAuthors.get(message.parentId) ?? [];
+    if (!authors.includes(message.author)) {
+      authors.push(message.author);
+      replyAuthors.set(message.parentId, authors);
+    }
   }
   return <div className="transcript" ref={container} role="log" aria-label="Room transcript" tabIndex={0}
     onScroll={(event) => {
@@ -58,6 +64,7 @@ export default function Transcript({ messages, tasks, files = [], onOpenThread }
       task={message.body.kind === 'task' ? byId.get(message.body.taskId) : undefined}
       file={message.body.kind === 'file' ? filesById.get(message.body.fileId) : undefined}
       replyCount={replyCounts.get(message.id) ?? 0}
+      participants={replyAuthors.get(message.id) ?? []}
       onOpenThread={onOpenThread} />)}
   </div>;
 }
