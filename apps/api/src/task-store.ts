@@ -157,6 +157,8 @@ export class TaskStore {
           // already acted on, which reads as a second pending question.
           proposal: null, proposalChoice: null, proposalBy: null, proposalByPrincipalId: null,
         };
+        // Keep log: this run's lines belong on the finished card. Reject is
+        // what clears them so a re-run does not inherit the previous attempt.
         const fields = outcome.status === 'done'
           ? { status: outcome.status, result: outcome.result, error: null, updatedAt: ts, ...cleared }
           : { status: outcome.status, error: outcome.error, result: null, updatedAt: ts, ...cleared };
@@ -292,6 +294,9 @@ export class TaskStore {
         claimedBy: null,
         result: null,
         error: null,
+        // A log belongs to the run that wrote it. The next attempt starts
+        // empty so claim then progress cannot concatenate onto the rejected run.
+        log: [],
       };
       const task = this.database.db.update(tasks).set(fields)
         .where(eq(tasks.id, id)).returning().get()!;

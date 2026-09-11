@@ -150,6 +150,7 @@ test('answer on a task not in needs_input is rejected and writes nothing', () =>
 test('answer flips needs_input to queued and preserves the answer', () => {
   const task = store.create(input);
   const claimed = store.claim(task.id, 'echo')!;
+  store.progress(claimed.id, claimed.runId!, 'work-so-far');
   store.ask(claimed.id, claimed.runId!, 'what colour');
   const before = bus.latestId();
   const answered = store.answer(task.id, 'blue', 'Moshe');
@@ -157,6 +158,7 @@ test('answer flips needs_input to queued and preserves the answer', () => {
   assert.equal(answered.answer, 'blue');
   assert.equal(answered.answeredBy, 'Moshe');
   assert.equal(answered.question, 'what colour');
+  assert.deepEqual(answered.log, ['work-so-far']);
   const added = bus.since(before);
   assert.deepEqual(added.map((event) => event.kind), ['task_status_changed']);
   if (added[0].kind !== 'task_status_changed') throw new Error('expected status change');
@@ -164,6 +166,8 @@ test('answer flips needs_input to queued and preserves the answer', () => {
   assert.throws(() => store.answer(task.id, 'green', 'Moshe'), /not waiting for an answer/);
   assert.equal(bus.latestId(), before + 1);
   assert.equal(store.get(task.id).answer, 'blue');
+  const resumed = store.claim(task.id, 'echo')!;
+  assert.deepEqual(resumed.log, ['work-so-far']);
 });
 
 test('replay of since=0 matches GET task and never goes done then running', () => {
@@ -194,6 +198,7 @@ test('replay of since=0 matches GET task and never goes done then running', () =
 test('accept leaves status and run fields alone', () => {
   const task = store.create(input);
   const claimed = store.claim(task.id, 'echo')!;
+  store.progress(claimed.id, claimed.runId!, 'kept-on-accept');
   store.finish(claimed.id, claimed.runId!, { status: 'done', result: 'ok' });
   const before = bus.latestId();
   const accepted = store.review(task.id, 'accepted', undefined, 'Moshe');
@@ -202,6 +207,7 @@ test('accept leaves status and run fields alone', () => {
   assert.equal(accepted.runId, claimed.runId);
   assert.equal(accepted.claimedBy, 'echo');
   assert.equal(accepted.error, null);
+  assert.deepEqual(accepted.log, ['kept-on-accept']);
   assert.equal(accepted.verdict, 'accepted');
   assert.equal(accepted.verdictNote, null);
   assert.equal(accepted.verdictBy, 'Moshe');
@@ -215,6 +221,7 @@ test('accept leaves status and run fields alone', () => {
 test('reject requeues and clears runId, result, and error', () => {
   const task = store.create({ ...input, agentId: 'echo' });
   const claimed = store.claim(task.id, 'echo')!;
+  store.progress(claimed.id, claimed.runId!, 'first-run-line');
   store.finish(claimed.id, claimed.runId!, { status: 'failed', error: 'boom' });
   const before = bus.latestId();
   const rejected = store.review(task.id, 'rejected', 'try again', 'Moshe');
@@ -223,6 +230,7 @@ test('reject requeues and clears runId, result, and error', () => {
   assert.equal(rejected.claimedBy, null);
   assert.equal(rejected.result, null);
   assert.equal(rejected.error, null);
+  assert.deepEqual(rejected.log, []);
   assert.equal(rejected.agentId, 'echo');
   assert.equal(rejected.verdict, 'rejected');
   assert.equal(rejected.verdictNote, 'try again');
@@ -234,6 +242,22 @@ test('reject requeues and clears runId, result, and error', () => {
   assert.equal(added[0].payload.task.status, INITIAL_STATUS);
   assert.throws(() => store.review(task.id, 'accepted', undefined, 'Moshe'), /not finished/);
   assert.equal(bus.latestId(), before + 1);
+});
+
+test('rejected rerun log is the second run only', () => {
+  const task = store.create(input);
+  const first = store.claim(task.id, 'echo')!;
+  store.progress(first.id, first.runId!, 'first-run-line');
+  store.finish(first.id, first.runId!, { status: 'done', result: 'first' });
+  assert.ok(store.get(task.id).log.includes('first-run-line'));
+  store.review(task.id, 'rejected', 'try again', 'Moshe');
+  assert.deepEqual(store.get(task.id).log, []);
+  const second = store.claim(task.id, 'echo')!;
+  store.progress(second.id, second.runId!, 'second-run-line');
+  store.finish(second.id, second.runId!, { status: 'done', result: 'second' });
+  const done = store.get(task.id);
+  assert.equal(done.log.includes('first-run-line'), false);
+  assert.ok(done.log.includes('second-run-line'));
 });
 
 test('reviewing an active task throws and writes nothing', () => {
@@ -289,6 +313,7 @@ test('propose fences on a stale run_id and parks needs_input', () => {
 test('decide records a proposal option and discuss, and rejects an unknown choice', () => {
   const task = store.create(input);
   const claimed = store.claim(task.id, 'echo')!;
+  store.progress(claimed.id, claimed.runId!, 'work-so-far');
   store.propose(claimed.id, claimed.runId!, proposal);
   const before = bus.latestId();
   assert.throws(() => store.decide(task.id, 'MySQL', 'Moshe'), /proposal options, discuss, or reject/);
@@ -298,11 +323,14 @@ test('decide records a proposal option and discuss, and rejects an unknown choic
   assert.equal(decided.status, INITIAL_STATUS);
   assert.equal(decided.proposalChoice, 'Postgres');
   assert.equal(decided.proposalBy, 'Moshe');
+  assert.deepEqual(decided.log, ['work-so-far']);
   const added = bus.since(before);
   assert.deepEqual(added.map((event) => event.kind), ['task_status_changed']);
   if (added[0].kind !== 'task_status_changed') throw new Error('expected status change');
   assert.equal(added[0].payload.previousStatus, 'needs_input');
   assert.throws(() => store.decide(task.id, 'SQLite', 'Moshe'), /not waiting for a decision/);
+  const resumed = store.claim(task.id, 'echo')!;
+  assert.deepEqual(resumed.log, ['work-so-far']);
   const other = store.create({ ...input, title: 'Talk it through' });
   const otherClaim = store.claim(other.id, 'echo')!;
   store.propose(otherClaim.id, otherClaim.runId!, proposal);
