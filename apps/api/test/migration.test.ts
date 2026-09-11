@@ -140,5 +140,15 @@ test('room migration preserves legacy task events and their replay ids', () => {
     };
     assert.equal(named.name, 'Loop');
     assert.deepEqual(sqlite.pragma('foreign_key_check'), []);
+    sqlite.prepare('INSERT INTO messages (id, room_id, author, body, created_at) VALUES (?, ?, ?, ?, ?)')
+      .run('legacy-msg', 'default', 'Human', '{"kind":"text","text":"old"}', 'then');
+    sqlite.exec(readFileSync('migrations/0013_message_parent.sql', 'utf8'));
+    const messageCols = sqlite.prepare('PRAGMA table_info(messages)').all() as { name: string }[];
+    assert.ok(messageCols.some((column) => column.name === 'parent_id'));
+    const legacy = sqlite.prepare('SELECT parent_id FROM messages WHERE id = ?').get('legacy-msg') as {
+      parent_id: null;
+    };
+    assert.equal(legacy.parent_id, null);
+    assert.deepEqual(sqlite.pragma('foreign_key_check'), []);
   } finally { sqlite.close(); }
 });

@@ -73,9 +73,16 @@ export interface Message {
   authorPrincipalId: string | null;
   body: MessageBody;
   createdAt: string;
+  parentId: string | null;
 }
 export interface MessageSnapshot { messages: Message[]; since: number }
-export interface CreateMessage { roomId: string; author: string; body: string; authorPrincipalId?: string | null }
+export interface CreateMessage {
+  roomId: string;
+  author: string;
+  body: string;
+  authorPrincipalId?: string | null;
+  parentId?: string | null;
+}
 
 export type TaskVerdict = 'accepted' | 'rejected';
 export function isTaskVerdict(value: unknown): value is TaskVerdict {

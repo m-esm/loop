@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  isActiveStatus, type MessageSnapshot, type RoomFile, type RoomFilesSnapshot,
+  isActiveStatus, type Message, type MessageSnapshot, type RoomFile, type RoomFilesSnapshot,
   type RoomsSnapshot, type RoomSummary, type Task, type TaskSnapshot,
 } from '@loop/types';
 import { api, ApiError, type Me } from '../lib/api';
@@ -12,13 +12,34 @@ import TasksFeed from './TasksFeed';
 import TasksPanel, { TaskDetail } from './TasksPanel';
 import Transcript from './Transcript';
 import Composer from './Composer';
+import MessageCard from './MessageCard';
 import LoginForm from './LoginForm';
 import ProjectsRailEntry from './ProjectsRailEntry';
 import RoomAgents from './RoomAgents';
 import Team from './Team';
 import FilesPanel from './FilesPanel';
 
-type InspectorKind = 'closed' | 'task' | 'team' | 'agents';
+type InspectorKind = 'closed' | 'task' | 'team' | 'agents' | 'thread';
+
+function relatedTask(message: Message, tasks: Task[]): Task | undefined {
+  if (message.body.kind !== 'task') return undefined;
+  const taskId = message.body.taskId;
+  return tasks.find((row) => row.id === taskId);
+}
+
+function relatedFile(message: Message, files: RoomFile[]): RoomFile | undefined {
+  if (message.body.kind !== 'file') return undefined;
+  const fileId = message.body.fileId;
+  return files.find((row) => row.id === fileId);
+}
+
+function threadTitle(message: Message | undefined, task?: Task, file?: RoomFile): string {
+  if (!message) return 'Thread';
+  const text = message.body.kind === 'text' ? message.body.text
+    : message.body.kind === 'task' ? (task?.title ?? 'Task')
+      : (file?.name ?? 'File');
+  return text.length > 80 ? `${text.slice(0, 77)}...` : text;
+}
 
 const ROOM_ID = /^[A-Za-z0-9_-]+$/;
 
@@ -54,6 +75,7 @@ export default function Room() {
   const [view, setView] = useState('chat');
   const [inspector, setInspector] = useState<InspectorKind>('closed');
   const [inspectTaskId, setInspectTaskId] = useState<string | null>(null);
+  const [inspectThreadId, setInspectThreadId] = useState<string | null>(null);
   const [inspectorHost, setInspectorHost] = useState<HTMLElement | null>(null);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -72,6 +94,7 @@ export default function Room() {
     setFiles([]);
     setInspector('closed');
     setInspectTaskId(null);
+    setInspectThreadId(null);
     setAuthReady(true);
   }
   useEffect(() => {
@@ -147,8 +170,19 @@ export default function Room() {
   useEffect(() => { setInspectorHost(document.getElementById('inspector')); }, []);
   useEffect(() => {
     setInspectTaskId(null);
-    setInspector((kind) => (kind === 'task' ? 'closed' : kind));
+    setInspectThreadId(null);
+    setInspector((kind) => (kind === 'task' || kind === 'thread' ? 'closed' : kind));
   }, [selected]);
+  function openThread(id: string) {
+    setInspectThreadId(id);
+    setInspectTaskId(null);
+    setInspector('thread');
+  }
+  function setInspectorKind(kind: InspectorKind) {
+    setInspector(kind);
+    if (kind !== 'thread') setInspectThreadId(null);
+    if (kind !== 'task') setInspectTaskId(null);
+  }
   async function logout() {
     try { await api('/auth/logout', { method: 'POST' }); } catch { /* cookie is cleared server-side even if this races */ }
     signedOut();
@@ -187,9 +221,14 @@ export default function Room() {
       kind={inspector}
       room={selected}
       roomName={selectedName}
+      author={me.displayName}
       task={state.tasks.find((row) => row.id === inspectTaskId)}
-      onKind={setInspector}
-      onClose={() => { setInspector('closed'); setInspectTaskId(null); }}
+      threadRoot={state.messages.find((row) => row.id === inspectThreadId)}
+      threadMessages={state.messages.filter((row) => row.id === inspectThreadId || row.parentId === inspectThreadId)}
+      tasks={state.tasks}
+      files={files}
+      onKind={setInspectorKind}
+      onClose={() => { setInspector('closed'); setInspectTaskId(null); setInspectThreadId(null); }}
     />}
     <nav aria-label="Room views">
       <span className="room-tab">
@@ -221,12 +260,12 @@ export default function Room() {
     {error && <p role="alert">{error} <button onClick={() => setAttempt((value) => value + 1)}>Retry</button></p>}
     {!cursors && !error && me && <p>Loading room...</p>}
     {cursors && me && (view === 'chat' ? <section aria-label="Chat">
-      <Transcript tasks={state.tasks} messages={state.messages} files={files} />
+      <Transcript tasks={state.tasks} messages={state.messages} files={files} onOpenThread={openThread} />
       <Composer author={me.displayName} roomId={selected} />
     </section> : view === 'tasks' ? <TasksPanel
       tasks={state.tasks}
       room={selected}
-      onSelectTask={(id) => { setInspectTaskId(id); setInspector('task'); }}
+      onSelectTask={(id) => { setInspectTaskId(id); setInspectorKind('task'); }}
     />
       : <FilesPanel room={selected} files={files} onChange={() => {
         void api<RoomFilesSnapshot>(`/rooms/${encodeURIComponent(selected)}/files`).then((snapshot) => setFiles(snapshot.files)).catch((err: Error) => setError(err.message));
@@ -235,19 +274,28 @@ export default function Room() {
 }
 
 function Inspector({
-  host, kind, room, roomName, task, onKind, onClose,
+  host, kind, room, roomName, author, task, threadRoot, threadMessages, tasks, files, onKind, onClose,
 }: {
   host: HTMLElement;
   kind: InspectorKind;
   room: string;
   roomName: string;
+  author: string;
   task: Task | undefined;
+  threadRoot: Message | undefined;
+  threadMessages: Message[];
+  tasks: Task[];
+  files: RoomFile[];
   onKind: (kind: InspectorKind) => void;
   onClose: () => void;
 }) {
   const open = kind !== 'closed';
-  const title = kind === 'task' ? (task?.title ?? 'Task') : kind === 'closed' ? '' : roomName;
-  const kindLabel = kind === 'task' ? 'Task' : kind === 'team' ? 'Team' : kind === 'agents' ? 'Agents' : '';
+  const threadTask = threadRoot ? relatedTask(threadRoot, tasks) : undefined;
+  const threadFile = threadRoot ? relatedFile(threadRoot, files) : undefined;
+  const title = kind === 'task' ? (task?.title ?? 'Task')
+    : kind === 'thread' ? threadTitle(threadRoot, threadTask, threadFile)
+      : kind === 'closed' ? '' : roomName;
+  const kindLabel = kind === 'task' ? 'Task' : kind === 'team' ? 'Team' : kind === 'agents' ? 'Agents' : kind === 'thread' ? 'THREAD' : '';
   return createPortal(
     <div className="inspector" data-inspector={kind}>
       {open && <div className="inspector-head">
@@ -261,12 +309,18 @@ function Inspector({
         <button type="button" aria-pressed={kind === 'agents'} onClick={() => onKind('agents')}>Agents</button>
       </div>
       <div className="inspector-body" data-inspector-body={kind}>
-        {kind === 'closed' && <p className="inspector-empty">Pick a task, Team, or Agents.</p>}
+        {kind === 'closed' && <p className="inspector-empty">Pick a task, Team, Agents, or a thread.</p>}
         {kind === 'task' && (task
           ? <TaskDetail task={task} />
           : <p className="inspector-empty">Select a task to see its owner and definition of done.</p>)}
         {kind === 'team' && <Team room={room} />}
         {kind === 'agents' && <RoomAgents room={room} />}
+        {kind === 'thread' && threadRoot && <div className="inspector-thread">
+          {threadMessages.map((message) => <MessageCard key={message.id} message={message} tasks={tasks}
+            task={relatedTask(message, tasks)}
+            file={relatedFile(message, files)} />)}
+          <Composer author={author} roomId={room} parentId={threadRoot.id} fieldId="thread-reply" label="Reply" />
+        </div>}
       </div>
     </div>,
     host,

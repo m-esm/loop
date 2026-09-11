@@ -27,9 +27,17 @@ export class MessageStore {
     }))();
   }
 
+  private resolveParent(room: string, parentId: string | null): string | null {
+    if (!parentId) return null;
+    const parent = this.database.db.select().from(messages).where(eq(messages.id, parentId)).get();
+    if (!parent || parent.roomId !== room) throw new BadRequestException('Unknown parent');
+    return parent.parentId ?? parent.id;
+  }
+
   create(input: CreateMessage) {
     roomId(input.roomId);
     assertKnownRoom(this.database, input.roomId);
+    const parentId = this.resolveParent(input.roomId, input.parentId ?? null);
     const parsed = parseComposer(input.body);
     if (parsed.kind === 'error') throw new BadRequestException(parsed.message);
     // Commit and publish the task first. Both calls are synchronous, so replay
@@ -43,9 +51,11 @@ export class MessageStore {
     };
     const event = this.bus.emitEvent(() => {
       const ts = new Date().toISOString();
+      const id = randomUUID();
+      if (parentId === id) throw new BadRequestException('Unknown parent');
       const message = this.database.db.insert(messages).values({
-        id: randomUUID(), roomId: input.roomId, author: input.author,
-        authorPrincipalId: input.authorPrincipalId ?? null, body, createdAt: ts,
+        id, roomId: input.roomId, author: input.author,
+        authorPrincipalId: input.authorPrincipalId ?? null, body, createdAt: ts, parentId,
       }).returning().get();
       return { subject_id: message.id, room_id: message.roomId, ts, kind: 'message_created', payload: { message } };
     });
@@ -61,7 +71,7 @@ export class MessageStore {
       const ts = new Date().toISOString();
       const message = this.database.db.insert(messages).values({
         id: randomUUID(), roomId: room, author, authorPrincipalId: authorPrincipalId ?? null,
-        body: { kind: 'file', fileId }, createdAt: ts,
+        body: { kind: 'file', fileId }, createdAt: ts, parentId: null,
       }).returning().get();
       return { subject_id: message.id, room_id: message.roomId, ts, kind: 'message_created', payload: { message } };
     });
@@ -78,7 +88,7 @@ export class MessageStore {
       const ts = new Date().toISOString();
       const message = this.database.db.insert(messages).values({
         id: randomUUID(), roomId: room, author, authorPrincipalId: authorPrincipalId ?? null,
-        body: { kind: 'task', taskId }, createdAt: ts,
+        body: { kind: 'task', taskId }, createdAt: ts, parentId: null,
       }).returning().get();
       return { subject_id: message.id, room_id: message.roomId, ts, kind: 'message_created', payload: { message } };
     });

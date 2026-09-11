@@ -14,6 +14,7 @@
     { "idx": 9, "version": "6", "when": 1789065000000, "tag": "0009_room_agents", "breakpoints": true },
     { "idx": 10, "version": "6", "when": 1789075146000, "tag": "0010_invites", "breakpoints": true },
     { "idx": 11, "version": "6", "when": 1789080000000, "tag": "0011_files", "breakpoints": true },
-    { "idx": 12, "version": "6", "when": 1789087120000, "tag": "0012_room_name", "breakpoints": true }
+    { "idx": 12, "version": "6", "when": 1789087120000, "tag": "0012_room_name", "breakpoints": true },
+    { "idx": 13, "version": "6", "when": 1789110000000, "tag": "0013_message_parent", "breakpoints": true }
   ]
 }

@@ -4,8 +4,9 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 import { isActiveStatus, type Message, type RoomFile, type Task } from '@loop/types';
 import MessageCard from './MessageCard';
 
-export default function Transcript({ messages, tasks, files = [] }: {
+export default function Transcript({ messages, tasks, files = [], onOpenThread }: {
   messages: Message[]; tasks: Task[]; files?: RoomFile[];
+  onOpenThread?: (id: string) => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
@@ -41,14 +42,22 @@ export default function Transcript({ messages, tasks, files = [] }: {
   }, [tasks]);
   const byId = new Map(tasks.map((task) => [task.id, task]));
   const filesById = new Map(files.map((file) => [file.id, file]));
+  const roots = messages.filter((message) => message.parentId == null);
+  const replyCounts = new Map<string, number>();
+  for (const message of messages) {
+    if (!message.parentId) continue;
+    replyCounts.set(message.parentId, (replyCounts.get(message.parentId) ?? 0) + 1);
+  }
   return <div className="transcript" ref={container} role="log" aria-label="Room transcript" tabIndex={0}
     onScroll={(event) => {
       const element = event.currentTarget;
       follow.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
     }}>
-    {!messages.length && <p className="muted">Start the conversation, or use /task to create a task here.</p>}
-    {messages.map((message) => <MessageCard key={message.id} message={message} tasks={tasks}
+    {!roots.length && <p className="muted">Start the conversation, or use /task to create a task here.</p>}
+    {roots.map((message) => <MessageCard key={message.id} message={message} tasks={tasks}
       task={message.body.kind === 'task' ? byId.get(message.body.taskId) : undefined}
-      file={message.body.kind === 'file' ? filesById.get(message.body.fileId) : undefined} />)}
+      file={message.body.kind === 'file' ? filesById.get(message.body.fileId) : undefined}
+      replyCount={replyCounts.get(message.id) ?? 0}
+      onOpenThread={onOpenThread} />)}
   </div>;
 }

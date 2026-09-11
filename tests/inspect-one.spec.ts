@@ -38,7 +38,7 @@ test('the inspector shows one of Task, Team, or Agents, and Close returns to emp
     await expect(agentsHeading).toHaveCount(0);
     await expect(page.getByRole('form', { name: 'Invite to room' })).toHaveCount(0);
     await expect(page.getByRole('form', { name: 'Add agent' })).toHaveCount(0);
-    await expect(empty).toHaveText('Pick a task, Team, or Agents.');
+    await expect(empty).toHaveText('Pick a task, Team, Agents, or a thread.');
     await expect(empty).toBeVisible();
     await expect(close).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Task', exact: true })).toBeVisible();
@@ -85,6 +85,21 @@ test('the inspector shows one of Task, Team, or Agents, and Close returns to emp
     await expect(page.getByRole('region', { name: 'Task detail' })).toHaveCount(0);
     await expect(teamHeading).toHaveCount(0);
     await expect(agentsHeading).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Chat' }).click();
+    await page.getByLabel('Message', { exact: true }).fill('hello');
+    await page.getByLabel('Message', { exact: true }).press('Enter');
+    await expect(page.getByRole('log').locator('[data-message-id]')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Reply' }).click();
+    await expect(page.locator('.inspector-kind')).toHaveText('THREAD');
+    await expect(page.locator('[data-inspector-body="thread"]')).toBeVisible();
+    await expect(page.locator('[data-inspector-body="team"]')).toHaveCount(0);
+    await expect(page.locator('[data-inspector-body="agents"]')).toHaveCount(0);
+    await expect(page.locator('[data-inspector-body="task"]')).toHaveCount(0);
+    await expect(teamHeading).toHaveCount(0);
+    await expect(agentsHeading).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Task detail' })).toHaveCount(0);
+    await expect(close).toBeVisible();
   } finally {
     await Promise.all(contexts.map((item) => item.close()));
     await stop();

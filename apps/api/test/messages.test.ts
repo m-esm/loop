@@ -105,3 +105,34 @@ test('a /task mention stores agentId and a bare @ is rejected', async () => {
   assert.equal(addressedTask.agentId, 'reviewer');
   assert.equal((await post({ ...input, body: '/task @' })).status, 400);
 });
+
+test('a reply stores the root parentId and rejects unknown or foreign parents', async () => {
+  const rootRes = await post({ ...input, body: 'root' });
+  assert.equal(rootRes.status, 201);
+  const root = await rootRes.json() as Message;
+  assert.equal(root.parentId, null);
+  const replyRes = await post({ ...input, body: 'reply', parentId: root.id });
+  assert.equal(replyRes.status, 201);
+  const reply = await replyRes.json() as Message;
+  assert.equal(reply.parentId, root.id);
+  const nestedRes = await post({ ...input, body: 'nested', parentId: reply.id });
+  assert.equal(nestedRes.status, 201);
+  const nested = await nestedRes.json() as Message;
+  assert.equal(nested.parentId, root.id);
+  assert.equal((await post({ ...input, body: 'ghost', parentId: 'missing-parent' })).status, 400);
+  const other = await fetch(`${url}/rooms`, {
+    method: 'POST', headers: jsonHeaders(cookie), body: JSON.stringify({ name: 'Other' }),
+  });
+  assert.equal(other.status, 201);
+  const room = await other.json() as { id: string };
+  const foreign = await fetch(`${url}/messages`, {
+    method: 'POST', headers: jsonHeaders(cookie),
+    body: JSON.stringify({ roomId: room.id, body: 'elsewhere' }),
+  });
+  assert.equal(foreign.status, 201);
+  const foreignMsg = await foreign.json() as Message;
+  assert.equal((await post({ ...input, body: 'cross', parentId: foreignMsg.id })).status, 400);
+  const snapshot = await (await fetch(`${url}/messages?roomId=default`, { headers: { Cookie: cookie } })).json() as MessageSnapshot;
+  assert.ok(snapshot.messages.some((row) => row.id === reply.id && row.parentId === root.id));
+  assert.ok(snapshot.messages.some((row) => row.id === nested.id && row.parentId === root.id));
+});
