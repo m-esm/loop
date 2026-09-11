@@ -78,7 +78,10 @@ test('a message opens a thread in the inspector and replies stay off the main st
     await expect(page.locator('[data-inspector-body="thread"]')).toContainText('in thread');
     await expect(transcript.locator('[data-message-id]')).toHaveCount(1);
     await expect(transcript.getByText('in thread')).toHaveCount(0);
-    await expect(transcript.getByRole('button', { name: '1 reply' })).toBeVisible();
+    const summary = transcript.locator('[data-thread-summary]');
+    await expect(summary).toBeVisible();
+    await expect(summary).toContainText('1 reply');
+    await expect(transcript.getByRole('button', { name: 'Reply', exact: true })).toHaveCount(0);
 
     const live = await request.post(`${apiUrl}/messages`, {
       data: { roomId: 'default', body: 'from other tab', parentId: root.id },
@@ -86,7 +89,18 @@ test('a message opens a thread in the inspector and replies stay off the main st
     expect(live.status()).toBe(201);
     await expect(page.locator('[data-inspector-body="thread"]')).toContainText('from other tab');
     await expect(transcript.getByText('from other tab')).toHaveCount(0);
-    await expect(transcript.getByRole('button', { name: '2 replies' })).toBeVisible();
+    await expect(summary).toBeVisible();
+    await expect(summary).toContainText('2 replies');
+    await expect(summary.locator('[data-participant]')).toHaveCount(1);
+    await expect(summary.locator('[data-participant]')).toContainText('M');
+    await expect(summary).toBeInViewport({ ratio: 1 });
+    await expect(transcript.getByRole('button', { name: 'Reply', exact: true })).toHaveCount(0);
+    await close.click();
+    await expect(empty).toBeVisible();
+    await page.screenshot({ path: resolve('docs/screenshots/thread-participants.png') });
+    await summary.click();
+    await expect(page.locator('.inspector-kind')).toHaveText('THREAD');
+    await expect(page.locator('[data-inspector-body="thread"]')).toBeVisible();
 
     await close.click();
     await expect(empty).toBeVisible();
