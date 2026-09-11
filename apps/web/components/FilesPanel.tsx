@@ -1,8 +1,10 @@
 'use client';
 
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { RoomFile } from '@loop/types';
 import { API_URL, api } from '../lib/api';
+
+const PREVIEW_BYTES = 4096;
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -10,8 +12,53 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default function FilesPanel({ room, files, onChange }: {
-  room: string; files: RoomFile[]; onChange: () => void;
+function isTextPreview(contentType: string): boolean {
+  return contentType.startsWith('text/');
+}
+
+export function ArtifactPreview({ file }: { file: RoomFile }) {
+  const [preview, setPreview] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const texty = isTextPreview(file.contentType);
+  useEffect(() => {
+    if (!texty) {
+      setPreview(null);
+      setError('');
+      return;
+    }
+    const controller = new AbortController();
+    fetch(`${API_URL}/rooms/${file.roomId}/files/${file.id}/content`, {
+      credentials: 'include',
+      cache: 'no-store',
+      signal: controller.signal,
+    }).then(async (response) => {
+      if (!response.ok) throw new Error(`Preview failed (${response.status})`);
+      const buf = await response.arrayBuffer();
+      const slice = buf.byteLength > PREVIEW_BYTES ? buf.slice(0, PREVIEW_BYTES) : buf;
+      setPreview(new TextDecoder('utf-8').decode(slice));
+      setError('');
+    }).catch((err: Error) => {
+      if (!controller.signal.aborted) {
+        setPreview(null);
+        setError(err.message);
+      }
+    });
+    return () => controller.abort();
+  }, [file.id, file.roomId, texty]);
+  return (
+    <section className="task-detail" aria-label="Artifact preview">
+      <p data-file-name>{file.name}</p>
+      <p className="muted" data-file-size>{formatSize(file.size)}</p>
+      <p className="muted">{file.contentType}</p>
+      <a href={`${API_URL}/rooms/${file.roomId}/files/${file.id}/content`} download={file.name}>Download</a>
+      {error && <p role="alert">{error}</p>}
+      {preview != null && <pre>{preview}</pre>}
+    </section>
+  );
+}
+
+export default function FilesPanel({ room, files, onChange, onSelectFile }: {
+  room: string; files: RoomFile[]; onChange: () => void; onSelectFile: (file: RoomFile) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -48,7 +95,7 @@ export default function FilesPanel({ room, files, onChange }: {
     </form>
     <ul className="files-list">
       {files.map((file) => <li key={file.id} data-file-row={file.id}>
-        <span data-file-name>{file.name}</span>
+        <button type="button" className="task-title" data-file-name onClick={() => onSelectFile(file)}>{file.name}</button>
         <span className="muted" data-file-size>{formatSize(file.size)}</span>
         <a href={`${API_URL}/rooms/${file.roomId}/files/${file.id}/content`} download={file.name}>Download</a>
       </li>)}
