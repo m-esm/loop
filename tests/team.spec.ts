@@ -24,6 +24,7 @@ test('owner invites, invitee registers with the token, lands as a member of that
     await page.getByLabel('Project name').fill('Klonk');
     await page.getByRole('button', { name: 'New project' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Klonk' })).toBeVisible();
+    await page.getByRole('button', { name: 'Team' }).click();
     const form = page.getByRole('form', { name: 'Invite to room' });
     await expect(form).toBeVisible();
     await form.getByLabel('Email').fill('ada@x.com');

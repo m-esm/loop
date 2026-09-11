@@ -1,18 +1,15 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
-import { createPortal } from 'react-dom';
 import type { CreatedRoomInvite, RoomInvite, RoomMembersSnapshot } from '@loop/types';
 import { api } from '../lib/api';
 
 export default function Team({ room }: { room: string }) {
-  const [host, setHost] = useState<HTMLElement | null>(null);
   const [snapshot, setSnapshot] = useState<RoomMembersSnapshot | null>(null);
   const [invites, setInvites] = useState<RoomInvite[]>([]);
   const [link, setLink] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  useEffect(() => { setHost(document.getElementById('room-team')); }, []);
   useEffect(() => {
     const controller = new AbortController();
     api<RoomMembersSnapshot>(`/rooms/${room}/members`, { signal: controller.signal })
@@ -62,13 +59,12 @@ export default function Team({ room }: { room: string }) {
       setError(err instanceof Error ? err.message : 'Invite could not be created.');
     } finally { setBusy(false); }
   }
-  if (!host) return null;
   if (!snapshot) {
     if (!error) return null;
-    return createPortal(<p role="alert">{error}</p>, host);
+    return <p role="alert">{error}</p>;
   }
   const owner = snapshot.role === 'owner';
-  return createPortal(
+  return (
     <section aria-label="Team" className="room-team">
       <h2>Team</h2>
       {snapshot.members.length === 0
@@ -103,7 +99,6 @@ export default function Team({ room }: { room: string }) {
         </label>
       </div>}
       {error && <p role="alert">{error}</p>}
-    </section>,
-    host,
+    </section>
   );
 }
