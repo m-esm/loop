@@ -113,7 +113,11 @@ export default function Room() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
     });
-    setRooms((current) => current ? [...current, created] : [created]);
+    setRooms((current) => {
+      if (!current) return [created];
+      if (current.some((room) => room.id === created.id)) return current;
+      return [...current, created];
+    });
     setSelected(created.id);
   }
   if (!authReady) return <p>Loading room...</p>;
@@ -127,8 +131,8 @@ export default function Room() {
       onSelect={setSelected}
       onCreate={createRoom}
     />
-    <Team key={selected} room={selected} />
-    <RoomAgents key={selected} room={selected} />
+    <Team room={selected} />
+    <RoomAgents room={selected} />
     <nav aria-label="Room views">
       <span className="room-tab">
         <button aria-pressed={view === 'chat'} onClick={() => setView('chat')}>Chat</button>

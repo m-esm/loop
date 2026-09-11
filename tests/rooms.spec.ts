@@ -76,6 +76,9 @@ test('a message posted in one room does not appear in another', async ({ browser
     await page.getByRole('button', { name: 'New project' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Klonk' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Klonk' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('button', { name: 'Loop' })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'Klonk' })).toHaveCount(1);
+    await expect(page.getByRole('heading', { name: 'Team' })).toHaveCount(1);
     await page.getByLabel('Message', { exact: true }).fill('only in klonk');
     await page.getByRole('button', { name: 'Send' }).click();
     await expect(page.locator('.message-card').filter({ hasText: 'only in klonk' })).toBeVisible();
