@@ -1,14 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   isActiveStatus, type MessageSnapshot, type RoomFile, type RoomFilesSnapshot,
-  type RoomsSnapshot, type RoomSummary, type TaskSnapshot,
+  type RoomsSnapshot, type RoomSummary, type Task, type TaskSnapshot,
 } from '@loop/types';
 import { api, ApiError, type Me } from '../lib/api';
 import { applyTaskEvent, needsHumanCount, type RoomFeed } from '../lib/feed';
 import TasksFeed from './TasksFeed';
-import TasksPanel from './TasksPanel';
+import TasksPanel, { TaskDetail } from './TasksPanel';
 import Transcript from './Transcript';
 import Composer from './Composer';
 import LoginForm from './LoginForm';
@@ -16,6 +17,8 @@ import ProjectsRailEntry from './ProjectsRailEntry';
 import RoomAgents from './RoomAgents';
 import Team from './Team';
 import FilesPanel from './FilesPanel';
+
+type InspectorKind = 'closed' | 'task' | 'team' | 'agents';
 
 const ROOM_ID = /^[A-Za-z0-9_-]+$/;
 
@@ -49,6 +52,9 @@ export default function Room() {
   const [files, setFiles] = useState<RoomFile[]>([]);
   const [cursors, setCursors] = useState<{ tasks: number; messages: number } | null>(null);
   const [view, setView] = useState('chat');
+  const [inspector, setInspector] = useState<InspectorKind>('closed');
+  const [inspectTaskId, setInspectTaskId] = useState<string | null>(null);
+  const [inspectorHost, setInspectorHost] = useState<HTMLElement | null>(null);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const chatCount = needsHumanCount(state.tasks);
@@ -64,6 +70,8 @@ export default function Room() {
     setCursors(null);
     setState({ tasks: [], messages: [] });
     setFiles([]);
+    setInspector('closed');
+    setInspectTaskId(null);
     setAuthReady(true);
   }
   useEffect(() => {
@@ -136,6 +144,11 @@ export default function Room() {
     const heading = document.getElementById('room-heading');
     if (heading) heading.textContent = selectedName;
   }, [selectedName]);
+  useEffect(() => { setInspectorHost(document.getElementById('inspector')); }, []);
+  useEffect(() => {
+    setInspectTaskId(null);
+    setInspector((kind) => (kind === 'task' ? 'closed' : kind));
+  }, [selected]);
   async function logout() {
     try { await api('/auth/logout', { method: 'POST' }); } catch { /* cookie is cleared server-side even if this races */ }
     signedOut();
@@ -169,8 +182,15 @@ export default function Room() {
       onSelect={selectRoom}
       onCreate={createRoom}
     />
-    <Team room={selected} />
-    <RoomAgents room={selected} />
+    {inspectorHost && <Inspector
+      host={inspectorHost}
+      kind={inspector}
+      room={selected}
+      roomName={selectedName}
+      task={state.tasks.find((row) => row.id === inspectTaskId)}
+      onKind={setInspector}
+      onClose={() => { setInspector('closed'); setInspectTaskId(null); }}
+    />}
     <nav aria-label="Room views">
       <span className="room-tab">
         <button aria-pressed={view === 'chat'} onClick={() => setView('chat')}>Chat</button>
@@ -203,9 +223,52 @@ export default function Room() {
     {cursors && me && (view === 'chat' ? <section aria-label="Chat">
       <Transcript tasks={state.tasks} messages={state.messages} files={files} />
       <Composer author={me.displayName} roomId={selected} />
-    </section> : view === 'tasks' ? <TasksPanel tasks={state.tasks} room={selected} />
+    </section> : view === 'tasks' ? <TasksPanel
+      tasks={state.tasks}
+      room={selected}
+      onSelectTask={(id) => { setInspectTaskId(id); setInspector('task'); }}
+    />
       : <FilesPanel room={selected} files={files} onChange={() => {
         void api<RoomFilesSnapshot>(`/rooms/${encodeURIComponent(selected)}/files`).then((snapshot) => setFiles(snapshot.files)).catch((err: Error) => setError(err.message));
       }} />)}
   </>;
+}
+
+function Inspector({
+  host, kind, room, roomName, task, onKind, onClose,
+}: {
+  host: HTMLElement;
+  kind: InspectorKind;
+  room: string;
+  roomName: string;
+  task: Task | undefined;
+  onKind: (kind: InspectorKind) => void;
+  onClose: () => void;
+}) {
+  const open = kind !== 'closed';
+  const title = kind === 'task' ? (task?.title ?? 'Task') : kind === 'closed' ? '' : roomName;
+  const kindLabel = kind === 'task' ? 'Task' : kind === 'team' ? 'Team' : kind === 'agents' ? 'Agents' : '';
+  return createPortal(
+    <div className="inspector" data-inspector={kind}>
+      {open && <div className="inspector-head">
+        <span className="inspector-kind">{kindLabel}</span>
+        <h2 className="inspector-title">{title}</h2>
+        <button type="button" onClick={onClose}>Close</button>
+      </div>}
+      <div className="inspector-tabs" role="tablist" aria-label="Inspector">
+        <button type="button" aria-pressed={kind === 'task'} onClick={() => onKind('task')}>Task</button>
+        <button type="button" aria-pressed={kind === 'team'} onClick={() => onKind('team')}>Team</button>
+        <button type="button" aria-pressed={kind === 'agents'} onClick={() => onKind('agents')}>Agents</button>
+      </div>
+      <div className="inspector-body" data-inspector-body={kind}>
+        {kind === 'closed' && <p className="inspector-empty">Pick a task, Team, or Agents.</p>}
+        {kind === 'task' && (task
+          ? <TaskDetail task={task} />
+          : <p className="inspector-empty">Select a task to see its owner and definition of done.</p>)}
+        {kind === 'team' && <Team room={room} />}
+        {kind === 'agents' && <RoomAgents room={room} />}
+      </div>
+    </div>,
+    host,
+  );
 }

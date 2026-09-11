@@ -4,7 +4,19 @@ body { margin: 0; }
 .shell { display: grid; grid-template-columns: 180px minmax(0, 1fr) 280px; min-height: 100vh; }
 aside { padding: 28px 20px; background: #f7f8fa; }
 .projects { border-right: 1px solid #dce0e5; }
-.context { border-left: 1px solid #dce0e5; overflow-y: auto; }
+.context { border-left: 1px solid #dce0e5; overflow-y: auto; display: flex; flex-direction: column; }
+#inspector { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.inspector { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.inspector-head { display: flex; align-items: center; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid #dce0e5; }
+.inspector-kind { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: #616975; }
+.inspector-title { font-size: 15px; font-weight: 600; flex: 1; margin: 0; }
+.inspector-head button { padding: 4px 10px; font-size: 13px; }
+.inspector-tabs { display: flex; gap: 4px; padding-top: 10px; }
+.inspector-tabs button { font-size: 13px; border: 0; background: none; padding: 6px 10px; color: #616975; }
+.inspector-tabs button[aria-pressed="true"] { background: #253c55; color: #fff; }
+.inspector-body { flex: 1; overflow-y: auto; padding-top: 16px; }
+.inspector-empty { color: #616975; font-size: 14px; }
+.inspector .task-detail { margin-top: 0; }
 main { padding: 28px 32px; min-width: 0; display: flex; flex-direction: column; height: 100vh; }
 /* The chat section owns the leftover height so the transcript can never overlap
    the composer. A hardcoded transcript height guesses the composer's size and
@@ -45,7 +57,6 @@ th, td { padding: 14px 8px; border-bottom: 1px solid #e2e6eb; vertical-align: to
 .tp-chip.bad { background: #fce5e5; color: #823232; }
 .task-detail { margin-top: 28px; padding: 18px; border: 1px solid #dce0e5; overflow-wrap: anywhere; }
 .task-detail p { white-space: pre-wrap; }
-#task-context:has(.task-detail) > p { display: none; }
 [role="alert"] { color: #963737; }
 /* min-height would fight the flex column on a short viewport and push the
    composer off-screen, so the transcript only takes what is left. */

@@ -1,16 +1,13 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
-import { createPortal } from 'react-dom';
 import type { RoomAgent, RoomAgentsSnapshot } from '@loop/types';
 import { api } from '../lib/api';
 
 export default function RoomAgents({ room }: { room: string }) {
-  const [host, setHost] = useState<HTMLElement | null>(null);
   const [snapshot, setSnapshot] = useState<RoomAgentsSnapshot | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  useEffect(() => { setHost(document.getElementById('room-agents')); }, []);
   useEffect(() => {
     const controller = new AbortController();
     api<RoomAgentsSnapshot>(`/rooms/${room}/agents`, { signal: controller.signal })
@@ -50,13 +47,12 @@ export default function RoomAgents({ room }: { room: string }) {
       setError(err instanceof Error ? err.message : 'Agent could not be removed.');
     } finally { setBusy(false); }
   }
-  if (!host) return null;
   if (!snapshot) {
     if (!error) return null;
-    return createPortal(<p role="alert">{error}</p>, host);
+    return <p role="alert">{error}</p>;
   }
   const owner = snapshot.role === 'owner';
-  return createPortal(
+  return (
     <section aria-label="Room agents" className="room-agents">
       <h2>Agents</h2>
       {snapshot.agents.length === 0
@@ -80,7 +76,6 @@ export default function RoomAgents({ room }: { room: string }) {
         <button type="submit" disabled={busy}>{busy ? 'Saving...' : 'Add'}</button>
       </form>}
       {error && <p role="alert">{error}</p>}
-    </section>,
-    host,
+    </section>
   );
 }
