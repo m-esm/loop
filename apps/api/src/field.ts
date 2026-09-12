@@ -8,6 +8,15 @@ export function field(body: unknown, key: string, limit: number): string {
   return value.trim();
 }
 
+/** Like field, but empty-after-trim is valid (clearing a stored note). */
+export function textField(body: unknown, key: string, limit: number): string {
+  const value = body && typeof body === 'object' ? (body as Record<string, unknown>)[key] : undefined;
+  if (typeof value !== 'string' || value.length > limit) {
+    throw new BadRequestException(`${key} must be text of at most ${limit} characters`);
+  }
+  return value.trim();
+}
+
 export function optionalField(body: unknown, key: string, limit: number): string | undefined {
   const value = body && typeof body === 'object' ? (body as Record<string, unknown>)[key] : undefined;
   if (value === undefined) return undefined;

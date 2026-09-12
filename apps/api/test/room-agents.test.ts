@@ -147,6 +147,56 @@ test('an agent registered in room A cannot be addressed from room B', async () =
   assert.equal(home.agentId, 'scoped');
 });
 
+test('an owner patches mandate; empty clears; a member gets 403; unknown id is 404', async () => {
+  const added = await fetch(`${url}/rooms/default/agents`, {
+    method: 'POST', headers: headers(),
+    body: JSON.stringify({ catalogId: 'probe', name: 'mandated' }),
+  });
+  assert.equal(added.status, 201);
+  const agent = await added.json() as RoomAgent;
+  assert.equal(agent.mandate, '');
+  const patched = await fetch(`${url}/rooms/default/agents/${agent.id}`, {
+    method: 'PATCH', headers: headers(),
+    body: JSON.stringify({ mandate: 'stay on the happy path' }),
+  });
+  assert.equal(patched.status, 200);
+  assert.equal((await patched.json() as RoomAgent).mandate, 'stay on the happy path');
+  const listed = await fetch(`${url}/rooms/default/agents`, { headers: { Cookie: cookie } });
+  assert.equal(listed.status, 200);
+  const snapshot = await listed.json() as { agents: RoomAgent[] };
+  assert.equal(snapshot.agents.find((row) => row.id === agent.id)?.mandate, 'stay on the happy path');
+  const cleared = await fetch(`${url}/rooms/default/agents/${agent.id}`, {
+    method: 'PATCH', headers: headers(),
+    body: JSON.stringify({ mandate: '  ' }),
+  });
+  assert.equal(cleared.status, 200);
+  assert.equal((await cleared.json() as RoomAgent).mandate, '');
+  const tooLong = await fetch(`${url}/rooms/default/agents/${agent.id}`, {
+    method: 'PATCH', headers: headers(),
+    body: JSON.stringify({ mandate: 'a'.repeat(2001) }),
+  });
+  assert.equal(tooLong.status, 400);
+  const registered = await fetch(`${url}/auth/register`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'mandate-member@loop.local', password: 'password1', displayName: 'Member' }),
+  });
+  assert.equal(registered.status, 201);
+  const setCookie = registered.headers.get('set-cookie') ?? '';
+  const token = /loop_session=([^;]+)/.exec(setCookie)?.[1];
+  assert.ok(token);
+  const denied = await fetch(`${url}/rooms/default/agents/${agent.id}`, {
+    method: 'PATCH',
+    headers: jsonHeaders(`loop_session=${token}`),
+    body: JSON.stringify({ mandate: 'nope' }),
+  });
+  assert.equal(denied.status, 403);
+  const missing = await fetch(`${url}/rooms/default/agents/missing-agent`, {
+    method: 'PATCH', headers: headers(),
+    body: JSON.stringify({ mandate: 'gone' }),
+  });
+  assert.equal(missing.status, 404);
+});
+
 test('a duplicate name returns 400', async () => {
   const first = await fetch(`${url}/rooms/default/agents`, {
     method: 'POST', headers: headers(),

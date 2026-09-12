@@ -52,6 +52,7 @@ export const roomAgents = sqliteTable('room_agents', {
   roomId: text('room_id').notNull().references(() => rooms.id),
   catalogId: text('catalog_id').notNull(),
   name: text('name').notNull(),
+  mandate: text('mandate').notNull().default(''),
   createdBy: text('created_by').notNull(),
   createdAt: text('created_at').notNull(),
 });
