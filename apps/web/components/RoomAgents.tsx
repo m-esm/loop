@@ -4,11 +4,54 @@ import { useEffect, useState, type FormEvent } from 'react';
 import type { RoomAgent, RoomAgentsSnapshot } from '@loop/types';
 import { api } from '../lib/api';
 
-export function AgentProfile({ agent }: { agent: RoomAgent }) {
+export function AgentProfile({
+  agent, room, role, onUpdated,
+}: {
+  agent: RoomAgent;
+  room: string;
+  role: 'owner' | 'member';
+  onUpdated: (agent: RoomAgent) => void;
+}) {
+  const [draft, setDraft] = useState(agent.mandate);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setDraft(agent.mandate); }, [agent.id, agent.mandate]);
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      const updated = await api<RoomAgent>(`/rooms/${room}/agents/${agent.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mandate: draft }),
+      });
+      setDraft(updated.mandate);
+      onUpdated(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Mandate could not be saved.');
+    } finally { setBusy(false); }
+  }
+  const owner = role === 'owner';
   return (
     <section className="task-detail" aria-label="Agent profile">
       <p>@{agent.name}</p>
       <p className="muted">{agent.catalogId}</p>
+      {owner
+        ? <form aria-label="Edit mandate" onSubmit={(event) => { void save(event); }}>
+          <label className="wide">Mandate
+            <textarea
+              name="mandate"
+              maxLength={2000}
+              value={draft}
+              disabled={busy}
+              onChange={(event) => setDraft(event.target.value)}
+            />
+          </label>
+          <button type="submit" disabled={busy}>{busy ? 'Saving...' : 'Save'}</button>
+        </form>
+        : <p>{agent.mandate}</p>}
+      {error && <p role="alert">{error}</p>}
     </section>
   );
 }

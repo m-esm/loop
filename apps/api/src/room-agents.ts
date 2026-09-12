@@ -30,6 +30,7 @@ export function syncCatalogRoomAgents(database: Database, agents: AgentConfig[],
       roomId: room,
       catalogId: agent.id,
       name: agent.id,
+      mandate: '',
       createdBy: 'catalog',
       createdAt: ts,
     }).run();
@@ -64,6 +65,7 @@ export class RoomAgentStore {
         roomId: room,
         catalogId,
         name: mention,
+        mandate: '',
         createdBy,
         createdAt: new Date().toISOString(),
       }).returning().get();
@@ -72,6 +74,16 @@ export class RoomAgentStore {
       if (/unique/i.test(message)) throw new BadRequestException('An agent with this name already exists in the room');
       throw error;
     }
+  }
+
+  setMandate(room: string, id: string, mandate: string): RoomAgent {
+    assertKnownRoom(this.database, room);
+    const row = this.database.db.update(roomAgents)
+      .set({ mandate })
+      .where(and(eq(roomAgents.id, id), eq(roomAgents.roomId, room)))
+      .returning().get();
+    if (!row) throw new NotFoundException('Agent not found');
+    return row;
   }
 
   remove(room: string, id: string): RoomAgent {

@@ -150,5 +150,14 @@ test('room migration preserves legacy task events and their replay ids', () => {
     };
     assert.equal(legacy.parent_id, null);
     assert.deepEqual(sqlite.pragma('foreign_key_check'), []);
+    sqlite.exec(readFileSync('migrations/0014_agent_mandate.sql', 'utf8'));
+    const mandateCols = sqlite.prepare('PRAGMA table_info(room_agents)').all() as { name: string }[];
+    assert.ok(mandateCols.some((column) => column.name === 'mandate'));
+    const mandates = sqlite.prepare('SELECT mandate FROM room_agents WHERE room_id = ?').all('default') as {
+      mandate: string;
+    }[];
+    assert.ok(mandates.length > 0);
+    assert.ok(mandates.every((row) => row.mandate === ''));
+    assert.deepEqual(sqlite.pragma('foreign_key_check'), []);
   } finally { sqlite.close(); }
 });

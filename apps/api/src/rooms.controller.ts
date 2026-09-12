@@ -1,8 +1,8 @@
-import { Body, Controller, Delete, Get, Inject, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Inject, Param, Patch, Post, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { loadAgents } from './agents';
 import { actor, AuthService } from './auth';
-import { field, roomId } from './field';
+import { field, roomId, textField } from './field';
 import { RoomAgentStore } from './room-agents';
 
 @Controller('rooms')
@@ -39,6 +39,13 @@ export class RoomsController {
     const principal = actor(req);
     this.auth.requireOwner(principal.id, room);
     return this.agents.add(room, field(body, 'catalogId', 100), field(body, 'name', 100), principal.id);
+  }
+
+  @Patch(':room/agents/:id')
+  setMandate(@Param('room') roomParam: string, @Param('id') id: string, @Body() body: unknown, @Req() req: Request) {
+    const room = roomId(roomParam);
+    this.auth.requireOwner(actor(req).id, room);
+    return this.agents.setMandate(room, id, textField(body, 'mandate', 2000));
   }
 
   @Delete(':room/agents/:id')

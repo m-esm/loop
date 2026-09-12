@@ -1,0 +1,1 @@
+ALTER TABLE room_agents ADD COLUMN mandate TEXT NOT NULL DEFAULT '';

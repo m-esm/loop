@@ -16,6 +16,7 @@ export interface RoomAgent {
   roomId: string;
   catalogId: string;
   name: string;
+  mandate: string;
   createdBy: string;
   createdAt: string;
 }

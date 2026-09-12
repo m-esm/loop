@@ -245,6 +245,7 @@ export default function Room() {
       kind={inspector}
       room={selected}
       roomName={selectedName}
+      role={rooms?.find((row) => row.id === selected)?.role ?? 'member'}
       author={me.displayName}
       task={state.tasks.find((row) => row.id === inspectTaskId)}
       agent={inspectAgent}
@@ -255,6 +256,7 @@ export default function Room() {
       files={files}
       onKind={setInspectorKind}
       onSelectAgent={openAgent}
+      onUpdatedAgent={setInspectAgent}
       onOpenArtifact={openArtifact}
       onClose={() => { setInspector('closed'); setInspectTaskId(null); setInspectThreadId(null); setInspectAgent(null); setInspectFileId(null); }}
     />}
@@ -302,12 +304,13 @@ export default function Room() {
 }
 
 function Inspector({
-  host, kind, room, roomName, author, task, agent, file, threadRoot, threadMessages, tasks, files, onKind, onSelectAgent, onOpenArtifact, onClose,
+  host, kind, room, roomName, role, author, task, agent, file, threadRoot, threadMessages, tasks, files, onKind, onSelectAgent, onUpdatedAgent, onOpenArtifact, onClose,
 }: {
   host: HTMLElement;
   kind: InspectorKind;
   room: string;
   roomName: string;
+  role: 'owner' | 'member';
   author: string;
   task: Task | undefined;
   agent: RoomAgent | null;
@@ -318,6 +321,7 @@ function Inspector({
   files: RoomFile[];
   onKind: (kind: InspectorKind) => void;
   onSelectAgent: (agent: RoomAgent) => void;
+  onUpdatedAgent: (agent: RoomAgent) => void;
   onOpenArtifact: (file: RoomFile) => void;
   onClose: () => void;
 }) {
@@ -350,7 +354,7 @@ function Inspector({
         {kind === 'team' && <Team room={room} />}
         {kind === 'agents' && <RoomAgents room={room} onSelectAgent={onSelectAgent} />}
         {kind === 'agent' && (agent
-          ? <AgentProfile agent={agent} />
+          ? <AgentProfile agent={agent} room={room} role={role} onUpdated={onUpdatedAgent} />
           : <p className="inspector-empty">Select an agent to see its profile.</p>)}
         {kind === 'thread' && threadRoot && <div className="inspector-thread">
           {threadMessages.map((message) => <MessageCard key={message.id} message={message} tasks={tasks}
