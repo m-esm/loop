@@ -192,7 +192,7 @@ test('Files view shows an uploaded file and a member sees the file card', async 
     const ownerContext = await authedContext(browser, session.token);
     contexts.push(ownerContext);
     const page = await ownerContext.newPage();
-    await page.goto('http://127.0.0.1:3100');
+    await page.goto('http://127.0.0.1:3100/?room=default');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
     await page.getByRole('button', { name: 'Files', exact: true }).click();
     const form = page.getByRole('form', { name: 'Upload file' });
@@ -221,7 +221,7 @@ test('Files view shows an uploaded file and a member sees the file card', async 
     const memberContext = await authedContext(browser, token);
     contexts.push(memberContext);
     const memberPage = await memberContext.newPage();
-    await memberPage.goto('http://127.0.0.1:3100');
+    await memberPage.goto('http://127.0.0.1:3100/?room=default');
     await expect(memberPage.locator('[data-live]')).toHaveAttribute('data-live', '1');
     const card = memberPage.locator('.file-card').filter({ hasText: 'brief.txt' });
     await expect(card).toBeVisible();

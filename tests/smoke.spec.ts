@@ -56,7 +56,7 @@ test('smoke: a chat message appears and a short task finishes', async ({ browser
 
     const context = await authedContext(browser, session.token);
     const page = await context.newPage();
-    await page.goto('http://127.0.0.1:3100');
+    await page.goto('http://127.0.0.1:3100/?room=default');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
 
     // 1. Chat: a plain message reaches the transcript.

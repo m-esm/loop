@@ -279,6 +279,11 @@ th, td { padding: 14px 8px; border-bottom: 1px solid var(--hairline); vertical-a
 nav button[aria-pressed="true"] { background: var(--accent-soft); color: var(--text); border-color: var(--accent); }
 nav [data-live] { margin-left: auto; align-self: center; }
 nav .logout { margin-left: 12px; }
+.inbox h2 { font-size: 14px; margin-bottom: 16px; }
+.inbox-list { list-style: none; margin: 0; padding: 0; }
+.inbox-row { display: grid; gap: 8px; width: 100%; padding: 16px; text-align: left; background: var(--panel); border: 1px solid var(--hairline); border-radius: var(--radius-small); margin-bottom: 8px; overflow-wrap: anywhere; }
+.inbox-meta { display: flex; justify-content: space-between; gap: 12px; color: var(--secondary); font-size: 12px; }
+.inbox-reason { color: var(--alert); font-size: 13px; }
 .auth-panel { width: 100%; max-width: 420px; padding-top: 12px; }
 .auth-panel > .muted { font-size: 13px; line-height: 1.6; }
 .auth-panel h2 { margin-bottom: 8px; }

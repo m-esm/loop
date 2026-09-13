@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   isActiveStatus, type Message, type MessageSnapshot, type RoomAgent, type RoomFile, type RoomFilesSnapshot,
@@ -18,6 +18,7 @@ import ProjectsRailEntry from './ProjectsRailEntry';
 import RoomAgents, { AgentProfile } from './RoomAgents';
 import Team from './Team';
 import FilesPanel, { ArtifactPreview } from './FilesPanel';
+import Inbox from './Inbox';
 
 type InspectorKind = 'closed' | 'task' | 'team' | 'agents' | 'agent' | 'thread' | 'artifact';
 
@@ -60,6 +61,7 @@ function writeRoomQuery(id: string, mode: 'push' | 'replace') {
 }
 
 function membershipRoom(rooms: RoomSummary[], wanted: string | null): string {
+  if (!wanted) return '';
   if (wanted && rooms.some((room) => room.id === wanted)) return wanted;
   return rooms.find((room) => room.id === 'default')?.id ?? rooms[0]?.id ?? 'default';
 }
@@ -68,7 +70,8 @@ export default function Room() {
   const [me, setMe] = useState<Me | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [rooms, setRooms] = useState<RoomSummary[] | null>(null);
-  const [selected, setSelected] = useState('default');
+  const [selected, setSelected] = useState('');
+  const pendingTask = useRef<string | null>(null);
   const [state, setState] = useState<RoomFeed>({ tasks: [], messages: [] });
   const [files, setFiles] = useState<RoomFile[]>([]);
   const [cursors, setCursors] = useState<{ tasks: number; messages: number } | null>(null);
@@ -86,11 +89,11 @@ export default function Room() {
   const chatLabel = chatCount === 1 ? '1 task needs a human' : `${chatCount} tasks need a human`;
   const tasksLabel = tasksCount === 1 ? '1 task running' : `${tasksCount} tasks running`;
   const selectedName = rooms?.find((room) => room.id === selected)?.name
-    ?? (selected === 'default' ? 'Loop' : selected);
+    ?? (selected === 'default' ? 'Loop' : selected || 'Inbox');
   function signedOut() {
     setMe(null);
     setRooms(null);
-    setSelected('default');
+    setSelected('');
     setCursors(null);
     setState({ tasks: [], messages: [] });
     setFiles([]);
@@ -124,7 +127,7 @@ export default function Room() {
       setRooms(listed.rooms);
       const next = membershipRoom(listed.rooms, wanted);
       setSelected(next);
-      writeRoomQuery(next, 'replace');
+      if (next) writeRoomQuery(next, 'replace');
       setError('');
     }).catch((error: Error) => {
       if (controller.signal.aborted) return;
@@ -136,29 +139,29 @@ export default function Room() {
   useEffect(() => {
     function onPop() {
       const wanted = queryRoom();
-      setSelected((current) => rooms ? membershipRoom(rooms, wanted) : (wanted ?? current));
+      setSelected(rooms ? membershipRoom(rooms, wanted) : (wanted ?? ''));
     }
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, [rooms]);
   useEffect(() => {
     if (!me || rooms === null) return;
-    if (!rooms.some((room) => room.id === selected)) return;
+    if (selected && !rooms.some((room) => room.id === selected)) return;
     setCursors(null);
     setState({ tasks: [], messages: [] });
     setFiles([]);
     const controller = new AbortController();
     Promise.all([
       api<TaskSnapshot>('/tasks', { signal: controller.signal }),
-      api<MessageSnapshot>(`/messages?roomId=${encodeURIComponent(selected)}`, { signal: controller.signal }),
-      api<RoomFilesSnapshot>(`/rooms/${encodeURIComponent(selected)}/files`, { signal: controller.signal }),
+      selected ? api<MessageSnapshot>(`/messages?roomId=${encodeURIComponent(selected)}`, { signal: controller.signal }) : Promise.resolve({ messages: [], since: 0 }),
+      selected ? api<RoomFilesSnapshot>(`/rooms/${encodeURIComponent(selected)}/files`, { signal: controller.signal }) : Promise.resolve({ files: [] }),
     ]).then(([tasks, messages, roomFiles]) => {
       setState({
-        tasks: tasks.tasks.filter((task) => task.roomId === selected),
+        tasks: selected ? tasks.tasks.filter((task) => task.roomId === selected) : tasks.tasks,
         messages: messages.messages,
       });
       setFiles(roomFiles.files);
-      setCursors({ tasks: tasks.since, messages: messages.since });
+      setCursors({ tasks: tasks.since, messages: selected ? messages.since : tasks.since });
       setError('');
     }).catch((error: Error) => {
       if (controller.signal.aborted) return;
@@ -170,14 +173,18 @@ export default function Room() {
   useEffect(() => {
     const heading = document.getElementById('room-heading');
     if (heading) heading.textContent = selectedName;
-  }, [selectedName]);
+    const context = document.getElementById('room-context');
+    if (context) context.textContent = selected ? 'Project room' : 'Home';
+  }, [selectedName, selected]);
   useEffect(() => { setInspectorHost(document.getElementById('inspector')); }, []);
   useEffect(() => {
-    setInspectTaskId(null);
+    const taskId = pendingTask.current;
+    pendingTask.current = null;
+    setInspectTaskId(taskId);
     setInspectThreadId(null);
     setInspectAgent(null);
     setInspectFileId(null);
-    setInspector((kind) => (kind === 'task' || kind === 'thread' || kind === 'agent' || kind === 'artifact' ? 'closed' : kind));
+    setInspector((kind) => taskId ? 'task' : (!selected || kind === 'task' || kind === 'thread' || kind === 'agent' || kind === 'artifact' ? 'closed' : kind));
   }, [selected]);
   function openThread(id: string) {
     setInspectThreadId(id);
@@ -240,7 +247,7 @@ export default function Room() {
       onSelect={selectRoom}
       onCreate={createRoom}
     />
-    {inspectorHost && <Inspector
+    {inspectorHost && (selected ? <Inspector
       host={inspectorHost}
       kind={inspector}
       room={selected}
@@ -259,8 +266,9 @@ export default function Room() {
       onUpdatedAgent={setInspectAgent}
       onOpenArtifact={openArtifact}
       onClose={() => { setInspector('closed'); setInspectTaskId(null); setInspectThreadId(null); setInspectAgent(null); setInspectFileId(null); }}
-    />}
-    <nav aria-label="Room views">
+    /> : createPortal(<p className="inspector-empty">Select an inbox item to open its task.</p>, inspectorHost))}
+    <nav aria-label={selected ? 'Room views' : 'Inbox actions'}>
+      {selected && <>
       <span className="room-tab">
         <button aria-pressed={view === 'chat'} onClick={() => setView('chat')}>Chat</button>
         {chatCount > 0
@@ -276,10 +284,11 @@ export default function Room() {
       <span className="room-tab">
         <button aria-pressed={view === 'files'} onClick={() => setView('files')}>Files</button>
       </span>
+      </>}
       {me && <button type="button" className="logout" onClick={() => { void logout(); }}>Log out</button>}
       {cursors && me && <TasksFeed since={Math.min(cursors.tasks, cursors.messages)} onUnauthorized={signedOut} onEvent={(event) => {
         const baseline = event.kind === 'message_created' ? cursors.messages : cursors.tasks;
-        if (event.room_id === selected && event.id > baseline) {
+        if ((!selected && event.kind !== 'message_created' || event.room_id === selected) && event.id > baseline) {
           setState((rows) => applyTaskEvent(rows, event));
           if (event.kind === 'message_created' && event.payload.message.body.kind === 'file') {
             void api<RoomFilesSnapshot>(`/rooms/${encodeURIComponent(selected)}/files`).then((snapshot) => setFiles(snapshot.files)).catch(() => { /* next event retries */ });
@@ -288,8 +297,12 @@ export default function Room() {
       }} />}
     </nav>
     {error && <p role="alert">{error} <button onClick={() => setAttempt((value) => value + 1)}>Retry</button></p>}
-    {!cursors && !error && me && <p>Loading room...</p>}
-    {cursors && me && (view === 'chat' ? <section aria-label="Chat">
+    {!cursors && !error && me && <p>{selected ? 'Loading room...' : 'Loading inbox...'}</p>}
+    {cursors && me && (!selected ? <Inbox tasks={state.tasks} rooms={rooms ?? []} onSelect={(task) => {
+      pendingTask.current = task.id;
+      setView('chat');
+      selectRoom(task.roomId);
+    }} /> : view === 'chat' ? <section aria-label="Chat">
       <Transcript tasks={state.tasks} messages={state.messages} files={files} onOpenThread={openThread} onOpenArtifact={openArtifact} />
       <Composer author={me.displayName} roomId={selected} />
     </section> : view === 'tasks' ? <TasksPanel

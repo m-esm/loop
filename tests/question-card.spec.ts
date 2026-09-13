@@ -48,7 +48,7 @@ test('question card answers in the browser and the same task reaches done', asyn
     const a = await authedContext(browser, session.token);
     contexts.push(a);
     const page = await a.newPage();
-    await page.goto('http://127.0.0.1:3100');
+    await page.goto('http://127.0.0.1:3100/?room=default');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
 
     await page.getByLabel('Message', { exact: true }).fill('/task ASK: what colour :: proof');
