@@ -34,6 +34,10 @@ test('Board uses every shared status, updates live, opens the inspector, and tog
     await page.getByRole('button', { name: 'Tasks', exact: true }).click();
     const panel = page.getByRole('region', { name: 'Tasks', exact: true });
     const board = panel.getByRole('region', { name: 'Task board', exact: true });
+    await expect(panel.getByRole('form', { name: 'Create task' })).toHaveCount(0);
+    await panel.getByRole('button', { name: 'Create task', exact: true }).click();
+    await expect(panel.getByRole('form', { name: 'Create task' })).toBeVisible();
+    await panel.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(panel.getByRole('button', { name: 'Board', exact: true })).toHaveAttribute('aria-pressed', 'true');
     await expect(board.locator('[data-task-status]')).toHaveCount(TASK_STATUSES.length);
     expect(await board.locator('[data-task-status]').evaluateAll((columns) => columns.map((column) => column.getAttribute('data-task-status')))).toEqual(TASK_STATUSES);
@@ -61,6 +65,8 @@ test('Board uses every shared status, updates live, opens the inspector, and tog
       await expect(page.locator('.inspector-title')).toHaveText(task.title);
       await expect(page.getByRole('region', { name: 'Task detail' })).toContainText(task.definitionOfDone);
     }
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(page.getByRole('complementary', { name: 'Context panel' })).toHaveCount(0);
     await board.evaluate((element) => { element.scrollLeft = 0; });
     await page.screenshot({ path: resolve('docs/screenshots/board.png') });
     await panel.getByRole('button', { name: 'List', exact: true }).click();
@@ -72,6 +78,7 @@ test('Board uses every shared status, updates live, opens the inspector, and tog
     await panel.getByRole('button', { name: 'Board', exact: true }).click();
     await expect(board).toBeVisible();
     await expect(doneColumn.locator('[data-task-id]')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
     await page.setViewportSize({ width: 600, height: 900 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
     await board.locator('[data-task-status]').last().scrollIntoViewIfNeeded();

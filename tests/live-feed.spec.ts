@@ -104,6 +104,7 @@ test('two tabs receive creates and status changes, then reconnect and replay aft
       if (req.method() === 'GET' && req.url() === `${apiUrl}/tasks`) taskReads++;
       if (req.url().includes('/stream')) streamUrls.push(req.url());
     });
+    await tabA.getByRole('button', { name: 'Create task', exact: true }).click();
     await tabA.getByLabel('Title', { exact: true }).fill('Stream a new task across tabs');
     await tabA.getByLabel('Definition of done').fill('The second tab shows this task without a reload.');
     const started = Date.now();

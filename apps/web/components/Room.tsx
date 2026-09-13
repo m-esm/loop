@@ -82,6 +82,7 @@ export default function Room() {
   const [inspectAgent, setInspectAgent] = useState<RoomAgent | null>(null);
   const [inspectFileId, setInspectFileId] = useState<string | null>(null);
   const [inspectorHost, setInspectorHost] = useState<HTMLElement | null>(null);
+  const [accountHost, setAccountHost] = useState<HTMLElement | null>(null);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const chatCount = needsHumanCount(state.tasks);
@@ -177,6 +178,7 @@ export default function Room() {
     if (context) context.textContent = selected ? 'Project room' : 'Home';
   }, [selectedName, selected]);
   useEffect(() => { setInspectorHost(document.getElementById('inspector')); }, []);
+  useEffect(() => { setAccountHost(document.getElementById('account-chrome')); }, []);
   useEffect(() => {
     const taskId = pendingTask.current;
     pendingTask.current = null;
@@ -247,7 +249,11 @@ export default function Room() {
       onSelect={selectRoom}
       onCreate={createRoom}
     />
-    {inspectorHost && (selected ? <Inspector
+    {accountHost && createPortal(<div className="account-chrome" aria-label="Account">
+      <span>{me.displayName}</span>
+      <button type="button" onClick={() => { void logout(); }}>Log out</button>
+    </div>, accountHost)}
+    {inspectorHost && selected && inspector !== 'closed' && <Inspector
       host={inspectorHost}
       kind={inspector}
       room={selected}
@@ -266,8 +272,8 @@ export default function Room() {
       onUpdatedAgent={setInspectAgent}
       onOpenArtifact={openArtifact}
       onClose={() => { setInspector('closed'); setInspectTaskId(null); setInspectThreadId(null); setInspectAgent(null); setInspectFileId(null); }}
-    /> : createPortal(<p className="inspector-empty">Select an inbox item to open its task.</p>, inspectorHost))}
-    <nav aria-label={selected ? 'Room views' : 'Inbox actions'}>
+    />}
+    <div className="room-navigation"><nav aria-label={selected ? 'Room views' : 'Inbox actions'}>
       {selected && <>
       <span className="room-tab">
         <button aria-pressed={view === 'chat'} onClick={() => setView('chat')}>Chat</button>
@@ -285,7 +291,6 @@ export default function Room() {
         <button aria-pressed={view === 'files'} onClick={() => setView('files')}>Files</button>
       </span>
       </>}
-      {me && <button type="button" className="logout" onClick={() => { void logout(); }}>Log out</button>}
       {cursors && me && <TasksFeed since={Math.min(cursors.tasks, cursors.messages)} onUnauthorized={signedOut} onEvent={(event) => {
         const baseline = event.kind === 'message_created' ? cursors.messages : cursors.tasks;
         if ((!selected && event.kind !== 'message_created' || event.room_id === selected) && event.id > baseline) {
@@ -296,6 +301,10 @@ export default function Room() {
         }
       }} />}
     </nav>
+    {selected && inspector === 'closed' && <div className="room-tools" role="group" aria-label="Room details">
+      <button type="button" onClick={() => setInspectorKind('team')}>Team</button>
+      <button type="button" onClick={() => setInspectorKind('agents')}>Agents</button>
+    </div>}</div>
     {error && <p role="alert">{error} <button onClick={() => setAttempt((value) => value + 1)}>Retry</button></p>}
     {!cursors && !error && me && <p>{selected ? 'Loading room...' : 'Loading inbox...'}</p>}
     {cursors && me && (!selected ? <Inbox tasks={state.tasks} rooms={rooms ?? []} onSelect={(task) => {
@@ -348,7 +357,7 @@ function Inspector({
           : kind === 'closed' ? '' : roomName;
   const kindLabel = kind === 'task' ? 'Task' : kind === 'team' ? 'Team' : kind === 'agents' ? 'Agents' : kind === 'thread' ? 'THREAD' : kind === 'agent' ? 'AGENT' : kind === 'artifact' ? 'FILE' : '';
   return createPortal(
-    <div className="inspector" data-inspector={kind}>
+    <aside className="context" aria-label="Context panel"><div className="inspector" data-inspector={kind}>
       {open && <div className="inspector-head">
         <span className="inspector-kind">{kindLabel}</span>
         <h2 className="inspector-title">{title}</h2>
@@ -380,7 +389,7 @@ function Inspector({
           ? <ArtifactPreview file={file} />
           : <p className="inspector-empty">Select a file to preview.</p>)}
       </div>
-    </div>,
+    </div></aside>,
     host,
   );
 }

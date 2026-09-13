@@ -15,6 +15,7 @@ export default function ProjectsRailEntry({
 }) {
   const [host, setHost] = useState<HTMLElement | null>(null);
   const [name, setName] = useState('');
+  const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const baseTitle = useRef<string | null>(null);
@@ -37,6 +38,7 @@ export default function ProjectsRailEntry({
     try {
       await onCreate(name);
       setName('');
+      setExpanded(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Room could not be created.');
     } finally {
@@ -61,13 +63,14 @@ export default function ProjectsRailEntry({
             : null}
         </button>
       ))}
-      <form aria-label="New project" onSubmit={(event) => { void create(event); }}>
+      <button type="button" className="rail-create" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? 'Cancel' : 'New project'}</button>
+      {expanded && <form aria-label="New project" onSubmit={(event) => { void create(event); }}>
         <label htmlFor="new-project-name">Project name</label>
-        <input id="new-project-name" value={name} onChange={(event) => setName(event.target.value)}
+        <input autoFocus id="new-project-name" value={name} onChange={(event) => setName(event.target.value)}
           maxLength={100} required disabled={busy} />
         <button type="submit" disabled={busy}>New project</button>
         {error ? <p role="alert">{error}</p> : null}
-      </form>
+      </form>}
     </>,
     host,
   );
