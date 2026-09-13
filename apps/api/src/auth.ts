@@ -75,6 +75,7 @@ export class AuthService implements OnModuleInit {
       role: roomMembers.role,
       pausedAt: rooms.pausedAt,
       wrapUp: rooms.wrapUp,
+      verbosity: rooms.verbosity,
     }).from(roomMembers)
       .innerJoin(rooms, eq(rooms.id, roomMembers.roomId))
       .where(eq(roomMembers.principalId, principalId))
@@ -85,7 +86,7 @@ export class AuthService implements OnModuleInit {
   getRoom(principalId: string, room: string): RoomSummary {
     const { role } = this.membership(principalId, room);
     const row = this.database.db.select().from(rooms).where(eq(rooms.id, room)).get()!;
-    return { id: row.id, name: row.name, role, paused: row.pausedAt !== null, wrapUp: row.wrapUp };
+    return { id: row.id, name: row.name, role, paused: row.pausedAt !== null, wrapUp: row.wrapUp, verbosity: row.verbosity };
   }
 
   steerRoom(principalId: string, room: string, body: unknown): RoomSummary {
@@ -95,12 +96,15 @@ export class AuthService implements OnModuleInit {
     }
     const values = body as Record<string, unknown>;
     const keys = Object.keys(values);
-    if (!keys.length || keys.some((key) => !['paused', 'wrapUp'].includes(key) || typeof values[key] !== 'boolean')) {
-      throw new BadRequestException('Provide paused or wrapUp as booleans');
+    if (!keys.length || keys.some((key) => key === 'verbosity'
+      ? !['quiet', 'normal', 'verbose'].includes(values[key] as string)
+      : !['paused', 'wrapUp'].includes(key) || typeof values[key] !== 'boolean')) {
+      throw new BadRequestException('Provide paused or wrapUp as booleans, or verbosity as quiet, normal, or verbose');
     }
     this.database.db.update(rooms).set({
       ...(typeof values.paused === 'boolean' ? { pausedAt: values.paused ? new Date().toISOString() : null } : {}),
       ...(typeof values.wrapUp === 'boolean' ? { wrapUp: values.wrapUp } : {}),
+      ...(values.verbosity !== undefined ? { verbosity: values.verbosity as RoomSummary['verbosity'] } : {}),
     }).where(eq(rooms.id, room)).run();
     return this.getRoom(principalId, room);
   }
@@ -119,7 +123,7 @@ export class AuthService implements OnModuleInit {
         roomId: id, principalId, role: 'owner',
       }).run();
       syncCatalogRoomAgents(this.database, loadAgents(), id);
-      return { id, name, role: 'owner' as const, paused: false, wrapUp: false };
+      return { id, name, role: 'owner' as const, paused: false, wrapUp: false, verbosity: 'normal' as const };
     })();
   }
 
