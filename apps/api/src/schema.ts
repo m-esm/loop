@@ -4,6 +4,8 @@ import type { EventKind, MessageBody, TaskEvent, TaskProposal, TaskStatus, TaskV
 export const rooms = sqliteTable('rooms', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
+  pausedAt: text('paused_at'),
+  wrapUp: integer('wrap_up', { mode: 'boolean' }).notNull().default(false),
 });
 
 export const principals = sqliteTable('principals', {

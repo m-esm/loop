@@ -33,6 +33,16 @@ export class RoomsController {
     };
   }
 
+  @Get(':room')
+  getRoom(@Param('room') roomParam: string, @Req() req: Request) {
+    return this.auth.getRoom(actor(req).id, roomId(roomParam));
+  }
+
+  @Patch(':room/steer')
+  steer(@Param('room') roomParam: string, @Body() body: unknown, @Req() req: Request) {
+    return this.auth.steerRoom(actor(req).id, roomId(roomParam), body);
+  }
+
   @Post(':room/agents')
   create(@Param('room') roomParam: string, @Body() body: unknown, @Req() req: Request) {
     const room = roomId(roomParam);

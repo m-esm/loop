@@ -9,6 +9,8 @@ export interface RoomSummary {
   id: string;
   name: string;
   role: 'owner' | 'member';
+  paused: boolean;
+  wrapUp: boolean;
 }
 export interface RoomsSnapshot { rooms: RoomSummary[] }
 export interface RoomAgent {
