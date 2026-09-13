@@ -256,6 +256,10 @@ th, td { padding: 14px 8px; border-bottom: 1px solid var(--hairline); vertical-a
 .composer > .muted { font-size: 12px; }
 .composer .composer-hint { font-size: 11px; line-height: 1.8; }
 .composer:focus-within { border-color: var(--accent); }
+.composer-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.room-steering { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; border-left: 1px solid var(--hairline); padding-left: 12px; }
+.room-steering button { background: transparent; font-size: 12px; }
+.room-steering .muted { font-size: 12px; }
 .composer .wide { grid-column: 1 / -1; margin: 0; }
 nav button[aria-pressed="true"] { background: var(--accent-soft); color: var(--text); border-color: var(--accent); }
 nav [data-live] { margin-left: auto; align-self: center; }

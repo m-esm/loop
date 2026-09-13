@@ -5,6 +5,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { and, count, eq, gt, isNull, lte } from 'drizzle-orm';
 import type { Request } from 'express';
+import type { RoomSummary } from '@loop/types';
 import { loadAgents } from './agents';
 import {
   clearSessionCookie, hashPassword, hashToken, newToken, readCookie, SESSION_COOKIE,
@@ -67,19 +68,44 @@ export class AuthService implements OnModuleInit {
       .where(eq(roomMembers.principalId, principalId)).all().map((row) => row.roomId);
   }
 
-  listRooms(principalId: string): { id: string; name: string; role: 'owner' | 'member' }[] {
+  listRooms(principalId: string): RoomSummary[] {
     return this.database.db.select({
       id: rooms.id,
       name: rooms.name,
       role: roomMembers.role,
+      pausedAt: rooms.pausedAt,
+      wrapUp: rooms.wrapUp,
     }).from(roomMembers)
       .innerJoin(rooms, eq(rooms.id, roomMembers.roomId))
       .where(eq(roomMembers.principalId, principalId))
       .all()
-      .map((row) => ({ id: row.id, name: row.name, role: row.role as 'owner' | 'member' }));
+      .map(({ pausedAt, ...row }) => ({ ...row, paused: pausedAt !== null }));
   }
 
-  createRoom(principalId: string, name: string): { id: string; name: string; role: 'owner' } {
+  getRoom(principalId: string, room: string): RoomSummary {
+    const { role } = this.membership(principalId, room);
+    const row = this.database.db.select().from(rooms).where(eq(rooms.id, room)).get()!;
+    return { id: row.id, name: row.name, role, paused: row.pausedAt !== null, wrapUp: row.wrapUp };
+  }
+
+  steerRoom(principalId: string, room: string, body: unknown): RoomSummary {
+    this.requireOwner(principalId, room);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      throw new BadRequestException('Steering must be an object');
+    }
+    const values = body as Record<string, unknown>;
+    const keys = Object.keys(values);
+    if (!keys.length || keys.some((key) => !['paused', 'wrapUp'].includes(key) || typeof values[key] !== 'boolean')) {
+      throw new BadRequestException('Provide paused or wrapUp as booleans');
+    }
+    this.database.db.update(rooms).set({
+      ...(typeof values.paused === 'boolean' ? { pausedAt: values.paused ? new Date().toISOString() : null } : {}),
+      ...(typeof values.wrapUp === 'boolean' ? { wrapUp: values.wrapUp } : {}),
+    }).where(eq(rooms.id, room)).run();
+    return this.getRoom(principalId, room);
+  }
+
+  createRoom(principalId: string, name: string): RoomSummary {
     const id = roomSlug(name);
     return this.database.sqlite.transaction(() => {
       try {
@@ -93,7 +119,7 @@ export class AuthService implements OnModuleInit {
         roomId: id, principalId, role: 'owner',
       }).run();
       syncCatalogRoomAgents(this.database, loadAgents(), id);
-      return { id, name, role: 'owner' as const };
+      return { id, name, role: 'owner' as const, paused: false, wrapUp: false };
     })();
   }
 

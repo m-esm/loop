@@ -12,6 +12,8 @@ import { MessageStore } from './message-store';
 import { syncAgentPrincipals } from './principals';
 import { listTaskFiles } from './files';
 import { RunFenceError, TaskStore } from './task-store';
+import { and, eq, isNull, isNotNull } from 'drizzle-orm';
+import { rooms } from './schema';
 
 const PROGRESS_MIN_INTERVAL_MS = 500;
 const ASK_PREFIX = 'LOOP_ASK: ';
@@ -106,7 +108,9 @@ export class TaskRunner implements OnModuleInit, OnModuleDestroy {
 
   private claimNext() {
     if (this.busy || this.stopped) return;
-    const next = this.store.list().tasks.filter((task) => task.status === INITIAL_STATUS).at(-1);
+    const paused = new Set(this.store.database.db.select({ id: rooms.id }).from(rooms)
+      .where(isNotNull(rooms.pausedAt)).all().map((room) => room.id));
+    const next = this.store.list().tasks.filter((task) => task.status === INITIAL_STATUS && !paused.has(task.roomId)).at(-1);
     if (!next) return;
     const resolved = this.resolveAgent(next);
     const claimed = this.store.claim(next.id, resolved.claimedAs);
@@ -150,7 +154,9 @@ export class TaskRunner implements OnModuleInit, OnModuleDestroy {
 
   private startClaimed(claimed: Task, agent: AgentConfig) {
     this.busy = true;
-    defer(() => { void this.execute(claimed, agent); });
+    // Claim and spawn stay on the same event-loop turn so a pause request cannot
+    // land between them. The initial claim itself is already deferred by wake.
+    void this.execute(claimed, agent);
   }
 
   private async execute(task: Task, agent: AgentConfig) {
@@ -256,6 +262,11 @@ export class TaskRunner implements OnModuleInit, OnModuleDestroy {
       if (task.answer) env.LOOP_TASK_ANSWER = task.answer;
       if (task.verdictNote) env.LOOP_TASK_NOTE = task.verdictNote;
       if (task.proposalChoice) env.LOOP_TASK_CHOICE = task.proposalChoice;
+
+      const wrapped = this.store.database.db.update(rooms).set({ wrapUp: false })
+        .where(and(eq(rooms.id, task.roomId), isNull(rooms.pausedAt), eq(rooms.wrapUp, true)))
+        .returning({ id: rooms.id }).get();
+      if (wrapped) env.LOOP_TASK_STEERING = 'Wrap up: converge on a concrete result. Summarize the outcome and remaining blockers; avoid opening new work.';
 
       child = spawn(agent.command[0], agent.command.slice(1), {
         shell: false,

@@ -4,7 +4,7 @@ import { and, desc, eq, inArray } from 'drizzle-orm';
 import { INITIAL_STATUS, TASK_STATUSES, isActiveStatus, isProposalChoice, isRunningStatus, isTaskVerdict, type CreateTask, type TaskProposal, type TaskSnapshot, type TaskStatus } from '@loop/types';
 import { Database } from './database';
 import { EventBus } from './bus';
-import { events, tasks } from './schema';
+import { events, rooms, tasks } from './schema';
 import { roomId } from './field';
 import { assertKnownRoom } from './room-agents';
 
@@ -104,6 +104,8 @@ export class TaskStore {
   claim(id: string, agentId: string) {
     try {
       const event = this.bus.emitEvent(() => {
+        const room = this.database.db.select().from(rooms).where(eq(rooms.id, this.get(id).roomId)).get();
+        if (!room || room.pausedAt !== null) throw new RunFenceError();
         const ts = new Date().toISOString();
         const runId = randomUUID();
         const task = this.database.db.update(tasks).set({
