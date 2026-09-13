@@ -40,7 +40,7 @@ test('an owner adds an agent from the catalog and a /task @name routes to it', a
     const context = await authedContext(browser, session.token);
     contexts.push(context);
     const page = await context.newPage();
-    await page.goto('http://127.0.0.1:3100');
+    await page.goto('http://127.0.0.1:3100/?room=default');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
     await page.getByRole('button', { name: 'Agents' }).click();
     const form = page.getByRole('form', { name: 'Add agent' });

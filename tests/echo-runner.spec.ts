@@ -50,7 +50,7 @@ test('echo runner finishes /task without PATCH and fails FAIL: titles', async ({
     contexts.push(a, b);
     const tabA = await a.newPage();
     const tabB = await b.newPage();
-    await Promise.all([tabA.goto('http://127.0.0.1:3100'), tabB.goto('http://127.0.0.1:3100')]);
+    await Promise.all([tabA.goto('http://127.0.0.1:3100/?room=default'), tabB.goto('http://127.0.0.1:3100/?room=default')]);
     await expect(tabA.locator('[data-live]')).toHaveAttribute('data-live', '1');
     await expect(tabB.locator('[data-live]')).toHaveAttribute('data-live', '1');
 

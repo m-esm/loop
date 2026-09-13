@@ -40,7 +40,7 @@ test('login form then the room after login', async ({ browser, request }) => {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     contexts.push(context);
     const page = await context.newPage();
-    await page.goto('http://127.0.0.1:3100');
+    await page.goto('http://127.0.0.1:3100/?room=default');
     await expect(page.getByRole('form', { name: 'Sign in' })).toBeVisible();
     await expect(page.getByRole('form', { name: 'Create account' })).toBeVisible();
     const loginShot = resolve('/tmp/loop-auth-login.png');

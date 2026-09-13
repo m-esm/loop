@@ -37,7 +37,7 @@ test('a message opens a thread in the inspector and replies stay off the main st
     const context = await authedContext(browser, session.token);
     contexts.push(context);
     const page = await context.newPage();
-    await page.goto('http://127.0.0.1:3100');
+    await page.goto('http://127.0.0.1:3100/?room=default');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
 
     const teamHeading = page.getByRole('heading', { name: 'Team' });

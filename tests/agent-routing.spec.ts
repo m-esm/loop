@@ -71,7 +71,7 @@ test('two /task posts route to two different agent commands', async ({ browser, 
     const context = await authedContext(browser, session.token);
     contexts.push(context);
     const page = await context.newPage();
-    await page.goto('http://127.0.0.1:3100');
+    await page.goto('http://127.0.0.1:3100/?room=default');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
 
     await page.getByLabel('Message', { exact: true }).fill('/task Unassigned probe :: proof');

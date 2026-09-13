@@ -70,7 +70,7 @@ test('a message posted in one room does not appear in another', async ({ browser
     const context = await authedContext(browser, session.token);
     contexts.push(context);
     const page = await context.newPage();
-    await page.goto('http://127.0.0.1:3100');
+    await page.goto('http://127.0.0.1:3100/?room=default');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
     await page.getByLabel('Project name').fill('Klonk');
     await page.getByRole('button', { name: 'New project' }).click();
@@ -113,7 +113,7 @@ test('the open room follows ?room=: create, reload, second tab, and unknown id',
     const context = await authedContext(browser, session.token);
     contexts.push(context);
     const page = await context.newPage();
-    await page.goto('http://127.0.0.1:3100');
+    await page.goto('http://127.0.0.1:3100/?room=default');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
     await page.getByLabel('Project name').fill('Klonk');
     await page.getByRole('button', { name: 'New project' }).click();
@@ -164,7 +164,7 @@ test('a newly created room can run /task', async ({ browser, request: raw }) => 
     const context = await authedContext(browser, session.token);
     contexts.push(context);
     const page = await context.newPage();
-    await page.goto('http://127.0.0.1:3100');
+    await page.goto('http://127.0.0.1:3100/?room=default');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
     await page.getByLabel('Project name').fill('Klonk');
     await page.getByRole('button', { name: 'New project' }).click();

@@ -55,7 +55,7 @@ test('two tabs receive creates and status changes, then reconnect and replay aft
     const errors: string[] = [];
     tabA.on('pageerror', (error) => errors.push(error.message));
     tabB.on('pageerror', (error) => errors.push(error.message));
-    await Promise.all([tabA.goto('http://127.0.0.1:3100'), tabB.goto('http://127.0.0.1:3100')]);
+    await Promise.all([tabA.goto('http://127.0.0.1:3100/?room=default'), tabB.goto('http://127.0.0.1:3100/?room=default')]);
     await expect(tabA.locator('[data-live]')).toHaveAttribute('data-live', '1');
     await expect(tabB.locator('[data-live]')).toHaveAttribute('data-live', '1');
     let streamCount = 0;
@@ -96,6 +96,8 @@ test('two tabs receive creates and status changes, then reconnect and replay aft
     expect(streamCount).toBe(0);
     await tabA.getByRole('button', { name: 'Tasks', exact: true }).click();
     await tabB.getByRole('button', { name: 'Tasks', exact: true }).click();
+    await tabA.getByRole('button', { name: 'List', exact: true }).click();
+    await tabB.getByRole('button', { name: 'List', exact: true }).click();
     let taskReads = 0;
     const streamUrls: string[] = [];
     tabB.on('request', (req) => {
