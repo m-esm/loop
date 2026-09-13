@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setImmediate as defer } from 'node:timers';
@@ -78,6 +78,73 @@ test('echo runner claims a queued task and finishes with log and result', async 
   assert.equal(kinds[0], 'task_created');
   assert.ok(kinds.includes('task_status_changed'));
   assert.ok(kinds.includes('task_progress'));
+});
+
+test('verbosity controls live progress batches and passes the mode to queued children', async () => {
+  const received: TaskEvent[] = [];
+  bus.subscribe((event) => received.push(event));
+  rebuildRunner([{ id: 'probe', name: 'Probe', command: nodeCommand(`
+    const fs = require('node:fs');
+    const path = ${JSON.stringify(dir)};
+    process.stdout.write('first\\nsecond\\nthird\\n');
+    fs.writeFileSync(path + '/emitted', 'ready');
+    const timer = setInterval(() => {
+      if (!fs.existsSync(path + '/release')) return;
+      clearInterval(timer);
+      console.error('stderr line');
+      console.log(process.env.LOOP_TASK_VERBOSITY);
+    }, 10);
+  `) }]);
+  runner.start();
+  for (const level of ['quiet', 'verbose', 'normal']) {
+    database.sqlite.prepare('UPDATE rooms SET verbosity = ? WHERE id = ?').run(level, 'default');
+    const task = store.create(input);
+    await waitFor(() => existsSync(join(dir!, 'emitted')));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const progress = () => received.filter((event) => event.subject_id === task.id && event.kind === 'task_progress');
+    assert.equal(store.get(task.id).status, 'running');
+    assert.equal(progress().length, level === 'quiet' ? 0 : level === 'verbose' ? 3 : 1);
+    if (level === 'verbose') {
+      const events = progress();
+      assert.ok(Date.parse(events[2].ts) - Date.parse(events[0].ts) < 500);
+      assert.deepEqual(store.get(task.id).log, ['first', 'second', 'third']);
+    }
+    writeFileSync(join(dir!, 'release'), 'go');
+    await waitFor(() => store.get(task.id).status === 'done');
+    assert.equal(store.get(task.id).result, level);
+    if (level === 'quiet') {
+      assert.equal(progress().length, 0);
+      assert.deepEqual(store.get(task.id).log, []);
+    } else {
+      assert.ok(store.get(task.id).log.includes('stderr line'));
+      if (level === 'verbose') assert.equal(progress().length, 5);
+    }
+    rmSync(join(dir!, 'release'));
+    rmSync(join(dir!, 'emitted'));
+  }
+});
+
+test('quiet takes effect during a running turn and discards buffered normal progress', async () => {
+  rebuildRunner([{ id: 'probe', name: 'Probe', command: nodeCommand(`
+    const fs = require('node:fs');
+    process.stdout.write('first\\nbuffered\\n');
+    const timer = setInterval(() => {
+      if (!fs.existsSync(${JSON.stringify(join(dir!, 'release'))})) return;
+      clearInterval(timer);
+      console.error('hidden error detail');
+      process.stdout.write('final result');
+    }, 10);
+  `) }]);
+  const task = store.create(input);
+  runner.start();
+  await waitFor(() => store.get(task.id).log.includes('first'));
+  database.sqlite.prepare("UPDATE rooms SET verbosity = 'quiet' WHERE id = 'default'").run();
+  const since = bus.latestId();
+  writeFileSync(join(dir!, 'release'), 'go');
+  await waitFor(() => store.get(task.id).status === 'done');
+  assert.equal(store.get(task.id).result, 'final result');
+  assert.deepEqual(store.get(task.id).log, ['first']);
+  assert.equal(bus.since(since).filter((event) => event.kind === 'task_progress').length, 0);
 });
 
 test('FAIL: title lands on failed with error set', async () => {

@@ -36,7 +36,7 @@ export default function RoomSteering({ roomId }: { roomId: string }) {
     };
   }, [path]);
 
-  async function steer(change: { paused?: boolean; wrapUp?: boolean }) {
+  async function steer(change: { paused?: boolean; wrapUp?: boolean; verbosity?: RoomSummary['verbosity'] }) {
     if (saving.current) return;
     saving.current = true;
     ++revision.current;
@@ -60,6 +60,15 @@ export default function RoomSteering({ roomId }: { roomId: string }) {
     <button type="button" disabled={!room || room.role !== 'owner' || busy || room.wrapUp}
       title="Ask the next agent turn to converge on a result"
       onClick={() => { void steer({ wrapUp: true }); }}>Wrap up</button>
+    <div className="verbosity-dial" role="group" aria-label="Verbosity">
+      {(['quiet', 'normal', 'verbose'] as const).map((verbosity) => <button key={verbosity}
+        type="button" aria-pressed={room?.verbosity === verbosity}
+        disabled={!room || room.role !== 'owner' || busy}
+        title={room?.role === 'member' ? 'Only room owners can steer' : `${verbosity} task progress`}
+        onClick={() => { void steer({ verbosity }); }}>
+        {verbosity[0].toUpperCase() + verbosity.slice(1)}
+      </button>)}
+    </div>
     <span className="muted" role="status">{room?.paused ? 'Paused. ' : ''}{room?.wrapUp ? 'Wrap up queued.' : ''}</span>
     {error && <span role="alert">{error}</span>}
   </div>;

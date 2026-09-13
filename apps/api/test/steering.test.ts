@@ -167,12 +167,15 @@ test('steering is owner-only and validates booleans without partially applying b
   const memberCookie = registered.headers.get('set-cookie')!.split(';')[0];
   assert.equal((await steer({ paused: true }, memberCookie)).status, 403);
   assert.equal((await steer({ wrapUp: true }, memberCookie)).status, 403);
+  assert.equal((await steer({ verbosity: 'quiet' }, memberCookie)).status, 403);
   assert.equal((await steer({ paused: true }, '')).status, 401);
-  for (const body of [{}, { paused: 'true' }, { wrapUp: 1 }, { paused: true, wrapUp: null }, { extra: true }, []]) {
+  for (const body of [{}, { paused: 'true' }, { wrapUp: 1 }, { paused: true, wrapUp: null }, { extra: true }, [],
+    { paused: true, wrapUp: true, verbosity: 'loud' }, { verbosity: null }, { verbosity: 1 }]) {
     assert.equal((await steer(body)).status, 400);
   }
   assert.equal((await room()).paused, false);
   assert.equal((await room()).wrapUp, false);
+  assert.equal((await room()).verbosity, 'normal');
   await steer({ paused: true, wrapUp: true });
   await steer({ wrapUp: false });
   assert.equal((await room()).paused, true);
@@ -181,6 +184,18 @@ test('steering is owner-only and validates booleans without partially applying b
     method: 'POST', headers: jsonHeaders(cookie), body: JSON.stringify({ name: 'Private' }),
   });
   const privateRoom = await created.json() as RoomSummary;
+  assert.equal(privateRoom.verbosity, 'normal');
   const foreign = await fetch(`${url}/rooms/${privateRoom.id}`, { headers: jsonHeaders(memberCookie) });
   assert.equal(foreign.status, 403);
+});
+
+test('verbosity defaults to normal and owner changes persist in room reads and across restart', async () => {
+  assert.equal((await room()).verbosity, 'normal');
+  for (const verbosity of ['quiet', 'verbose', 'normal'] as const) {
+    assert.equal((await steer({ verbosity })).status, 200);
+    await restart();
+    assert.equal((await room()).verbosity, verbosity);
+    const listed = await (await fetch(`${url}/rooms`, { headers: jsonHeaders(cookie) })).json() as RoomsSnapshot;
+    assert.equal(listed.rooms.find((item) => item.id === 'default')?.verbosity, verbosity);
+  }
 });

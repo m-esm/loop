@@ -11,6 +11,7 @@ export interface RoomSummary {
   role: 'owner' | 'member';
   paused: boolean;
   wrapUp: boolean;
+  verbosity: 'quiet' | 'normal' | 'verbose';
 }
 export interface RoomsSnapshot { rooms: RoomSummary[] }
 export interface RoomAgent {

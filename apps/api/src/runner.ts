@@ -171,7 +171,10 @@ export class TaskRunner implements OnModuleInit, OnModuleDestroy {
     let lastProgress = 0;
     let lastStdout: string | undefined;
     let lastStderr: string | undefined;
+    const verbosity = () => this.store.database.db.select({ verbosity: rooms.verbosity }).from(rooms)
+      .where(eq(rooms.id, task.roomId)).get()?.verbosity ?? 'normal';
     const flush = () => {
+      if (verbosity() === 'quiet') { pending.length = 0; return; }
       if (!pending.length) return;
       try {
         this.store.progress(id, runId, pending.splice(0, pending.length));
@@ -187,8 +190,10 @@ export class TaskRunner implements OnModuleInit, OnModuleDestroy {
         if (sink === 'stdout') lastStdout = line;
         else lastStderr = line;
       }
+      const level = verbosity();
+      if (level === 'quiet') { pending.length = 0; return; }
       pending.push(line);
-      if (lastProgress === 0 || Date.now() - lastProgress >= PROGRESS_MIN_INTERVAL_MS) flush();
+      if (level === 'verbose' || lastProgress === 0 || Date.now() - lastProgress >= PROGRESS_MIN_INTERVAL_MS) flush();
     };
     const onStdout = (line: string) => {
       if (asked) return;
@@ -257,6 +262,7 @@ export class TaskRunner implements OnModuleInit, OnModuleDestroy {
         LOOP_TASK_TITLE: task.title,
         LOOP_TASK_ID: task.id,
         LOOP_TASK_DONE_WHEN: task.definitionOfDone,
+        LOOP_TASK_VERBOSITY: verbosity(),
         LOOP_TASK_FILES: JSON.stringify(listTaskFiles(this.store.database, task.roomId)),
       };
       if (task.answer) env.LOOP_TASK_ANSWER = task.answer;

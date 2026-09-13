@@ -1,11 +1,12 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
-import type { EventKind, MessageBody, TaskEvent, TaskProposal, TaskStatus, TaskVerdict } from '@loop/types';
+import type { EventKind, MessageBody, RoomSummary, TaskEvent, TaskProposal, TaskStatus, TaskVerdict } from '@loop/types';
 
 export const rooms = sqliteTable('rooms', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   pausedAt: text('paused_at'),
   wrapUp: integer('wrap_up', { mode: 'boolean' }).notNull().default(false),
+  verbosity: text('verbosity').$type<RoomSummary['verbosity']>().notNull().default('normal'),
 });
 
 export const principals = sqliteTable('principals', {
