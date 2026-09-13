@@ -71,6 +71,19 @@ nav { display: flex; flex-shrink: 0; flex-wrap: wrap; gap: 8px; border-bottom: 1
 nav button { background: transparent; border-color: transparent; padding: 6px 12px; color: var(--secondary); }
 nav strong { color: var(--text); }
 .task-heading { display: flex; align-items: baseline; justify-content: space-between; margin-top: 28px; }
+.task-view-toggle { display: flex; gap: 2px; padding: 3px; border: 1px solid var(--hairline); border-radius: var(--radius-small); }
+.task-view-toggle button { border: 0; background: transparent; color: var(--secondary); padding: 4px 10px; font-size: 13px; }
+.task-view-toggle button[aria-pressed="true"] { background: var(--raised); color: var(--text); }
+.task-board { display: flex; overflow-x: auto; padding-bottom: 16px; margin-bottom: 16px; }
+.task-board-column { flex: 0 0 176px; min-width: 0; min-height: 260px; padding: 0 10px; border-right: 1px solid var(--hairline); }
+.task-board-column:first-child { padding-left: 0; }
+.task-board-column:last-child { border-right: 0; }
+.task-board-column h4 { display: flex; justify-content: space-between; gap: 8px; margin: 0 0 14px; font-size: 12px; font-weight: 500; color: var(--secondary); }
+.task-board-column h4 .muted { font-size: inherit; }
+.task-board-card { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; width: 100%; margin-bottom: 8px; padding: 12px; text-align: left; border-color: var(--hairline); background: var(--panel); }
+.task-board-title { font-size: 13px; overflow-wrap: anywhere; }
+.task-board-owner { font-size: 11px; color: var(--secondary); overflow-wrap: anywhere; }
+.task-board-empty { font-size: 12px; color: var(--muted); }
 [data-live] { font-size: 13px; color: var(--secondary); }
 [data-live="1"] { color: var(--success); }
 form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px; background: var(--panel); border: 1px solid var(--hairline); border-radius: var(--radius-panel); margin-bottom: 24px; box-shadow: var(--shadow-panel); }
