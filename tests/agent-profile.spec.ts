@@ -47,13 +47,13 @@ test('clicking a room agent opens a closable agent profile in the inspector', as
     const teamHeading = page.getByRole('heading', { name: 'Team' });
     const agentsHeading = page.getByRole('heading', { name: 'Agents' });
     const close = page.getByRole('button', { name: 'Close' });
-    const empty = page.locator('.inspector-empty');
+    const inspector = page.getByRole('complementary', { name: 'Context panel' });
+    const agentsTab = page.getByRole('navigation', { name: 'Room views' }).getByRole('button', { name: 'Agents' });
     const profile = page.getByRole('region', { name: 'Agent profile' });
     const taskDetail = page.getByRole('region', { name: 'Task detail' });
     const agentBody = page.locator('[data-inspector-body="agent"]');
 
-    await expect(empty).toBeVisible();
-    await expect(empty).toHaveText('Pick a task, Team, Agents, or a thread.');
+    await expect(inspector).toHaveCount(0);
     await expect(close).toHaveCount(0);
     await expect(agentBody).toHaveCount(0);
     await expect(profile).toHaveCount(0);
@@ -61,8 +61,10 @@ test('clicking a room agent opens a closable agent profile in the inspector', as
     await expect(agentsHeading).toHaveCount(0);
     await page.screenshot({ path: resolve('docs/screenshots/agent-profile-closed.png') });
 
-    await page.getByRole('button', { name: 'Agents' }).click();
-    await expect(page.getByRole('form', { name: 'Add agent' })).toBeVisible();
+    await agentsTab.click();
+    await expect(agentsTab).toHaveAttribute('aria-pressed', 'true');
+    await expect(inspector).toHaveCount(0);
+    await expect(page.getByText('Add agent', { exact: true })).toBeVisible();
     await expect(agentsHeading).toHaveCount(1);
     await expect(teamHeading).toHaveCount(0);
     await expect(profile).toHaveCount(0);
@@ -81,21 +83,21 @@ test('clicking a room agent opens a closable agent profile in the inspector', as
     await expect(profile.getByText('@scout')).toBeVisible();
     await expect(profile.getByText('probe')).toBeVisible();
     await expect(teamHeading).toHaveCount(0);
-    await expect(agentsHeading).toHaveCount(0);
+    await expect(agentsHeading).toHaveCount(1);
     await expect(taskDetail).toHaveCount(0);
     await expect(page.locator('[data-inspector-body="thread"]')).toHaveCount(0);
     await expect(page.locator('[data-inspector-body="team"]')).toHaveCount(0);
     await expect(page.locator('[data-inspector-body="agents"]')).toHaveCount(0);
     await expect(page.locator('[data-inspector-body="task"]')).toHaveCount(0);
-    await expect(page.getByRole('form', { name: 'Add agent' })).toHaveCount(0);
+    await expect(page.getByRole('form', { name: 'Add agent' })).toBeHidden();
     await page.screenshot({ path: resolve('docs/screenshots/agent-profile-open.png') });
 
     await close.click();
-    await expect(empty).toBeVisible();
+    await expect(inspector).toHaveCount(0);
     await expect(profile).toHaveCount(0);
     await expect(agentBody).toHaveCount(0);
     await expect(close).toHaveCount(0);
-    await expect(agentsHeading).toHaveCount(0);
+    await expect(agentsHeading).toHaveCount(1);
     await expect(teamHeading).toHaveCount(0);
   } finally {
     await Promise.all(contexts.map((item) => item.close()));

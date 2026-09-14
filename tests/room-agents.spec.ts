@@ -42,7 +42,11 @@ test('an owner adds an agent from the catalog and a /task @name routes to it', a
     const page = await context.newPage();
     await page.goto('http://127.0.0.1:3100/?room=default');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
-    await page.getByRole('button', { name: 'Agents' }).click();
+    const views = page.getByRole('navigation', { name: 'Room views' });
+    await views.getByRole('button', { name: 'Agents' }).click();
+    await expect(views.getByRole('button', { name: 'Agents' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('complementary', { name: 'Context panel' })).toHaveCount(0);
+    await page.getByText('Add agent', { exact: true }).click();
     const form = page.getByRole('form', { name: 'Add agent' });
     await expect(form).toBeVisible();
     await form.getByLabel('Catalog').selectOption('probe');
@@ -54,7 +58,9 @@ test('an owner adds an agent from the catalog and a /task @name routes to it', a
     await expect(form.getByRole('button', { name: 'Add' })).toBeInViewport({ ratio: 1 });
     await expect(form.getByLabel('Catalog')).toBeInViewport({ ratio: 1 });
     await expect(page.locator('.room-agents li').filter({ hasText: '@scout' })).toBeInViewport({ ratio: 1 });
+    await page.screenshot({ path: 'docs/screenshots/room-agents.png' });
 
+    await views.getByRole('button', { name: 'Chat' }).click();
     await page.getByLabel('Message', { exact: true }).fill('/task @scout Named scout :: proof');
     const posted = page.waitForResponse((response) => response.url().endsWith('/messages') && response.request().method() === 'POST');
     await page.getByLabel('Message', { exact: true }).press('Enter');
@@ -63,7 +69,6 @@ test('an owner adds an agent from the catalog and a /task @name routes to it', a
     const card = page.locator('.chat-task').filter({ hasText: 'Named scout' });
     await expect(card.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
     await expect(card.locator('[data-task-result]')).toHaveText(probeToken);
-    await page.screenshot({ path: 'docs/screenshots/room-agents.png' });
     const task = await (await request.get(`${apiUrl}/tasks/${cardMessage.body.taskId}`)).json() as Task;
     expect(task.agentId).toBe('scout');
     expect(task.claimedBy).toBe('probe');
