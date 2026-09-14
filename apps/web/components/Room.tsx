@@ -20,7 +20,7 @@ import Team from './Team';
 import FilesPanel, { ArtifactPreview } from './FilesPanel';
 import Inbox from './Inbox';
 
-type InspectorKind = 'closed' | 'task' | 'team' | 'agents' | 'agent' | 'thread' | 'artifact';
+type InspectorKind = 'closed' | 'task' | 'team' | 'agent' | 'thread' | 'artifact';
 
 function relatedTask(message: Message, tasks: Task[]): Task | undefined {
   if (message.body.kind !== 'task') return undefined;
@@ -268,7 +268,6 @@ export default function Room() {
       tasks={state.tasks}
       files={files}
       onKind={setInspectorKind}
-      onSelectAgent={openAgent}
       onUpdatedAgent={setInspectAgent}
       onOpenArtifact={openArtifact}
       onClose={() => { setInspector('closed'); setInspectTaskId(null); setInspectThreadId(null); setInspectAgent(null); setInspectFileId(null); }}
@@ -288,6 +287,9 @@ export default function Room() {
           : null}
       </span>
       <span className="room-tab">
+        <button aria-pressed={view === 'agents'} onClick={() => { setView('agents'); setInspectorKind('closed'); }}>Agents</button>
+      </span>
+      <span className="room-tab">
         <button aria-pressed={view === 'files'} onClick={() => setView('files')}>Files</button>
       </span>
       </>}
@@ -303,7 +305,6 @@ export default function Room() {
     </nav>
     {selected && inspector === 'closed' && <div className="room-tools" role="group" aria-label="Room details">
       <button type="button" onClick={() => setInspectorKind('team')}>Team</button>
-      <button type="button" onClick={() => setInspectorKind('agents')}>Agents</button>
     </div>}</div>
     {error && <p role="alert">{error} <button onClick={() => setAttempt((value) => value + 1)}>Retry</button></p>}
     {!cursors && !error && me && <p>{selected ? 'Loading room...' : 'Loading inbox...'}</p>}
@@ -319,6 +320,7 @@ export default function Room() {
       room={selected}
       onSelectTask={(id) => { setInspectTaskId(id); setInspectorKind('task'); }}
     />
+      : view === 'agents' ? <RoomAgents key={selected} room={selected} onSelectAgent={openAgent} />
       : <FilesPanel room={selected} files={files} onSelectFile={openArtifact} onChange={() => {
         void api<RoomFilesSnapshot>(`/rooms/${encodeURIComponent(selected)}/files`).then((snapshot) => setFiles(snapshot.files)).catch((err: Error) => setError(err.message));
       }} />)}
@@ -326,7 +328,7 @@ export default function Room() {
 }
 
 function Inspector({
-  host, kind, room, roomName, role, author, task, agent, file, threadRoot, threadMessages, tasks, files, onKind, onSelectAgent, onUpdatedAgent, onOpenArtifact, onClose,
+  host, kind, room, roomName, role, author, task, agent, file, threadRoot, threadMessages, tasks, files, onKind, onUpdatedAgent, onOpenArtifact, onClose,
 }: {
   host: HTMLElement;
   kind: InspectorKind;
@@ -342,7 +344,6 @@ function Inspector({
   tasks: Task[];
   files: RoomFile[];
   onKind: (kind: InspectorKind) => void;
-  onSelectAgent: (agent: RoomAgent) => void;
   onUpdatedAgent: (agent: RoomAgent) => void;
   onOpenArtifact: (file: RoomFile) => void;
   onClose: () => void;
@@ -355,7 +356,7 @@ function Inspector({
       : kind === 'agent' ? (agent?.name ?? 'Agent')
         : kind === 'artifact' ? (file?.name ?? 'File')
           : kind === 'closed' ? '' : roomName;
-  const kindLabel = kind === 'task' ? 'Task' : kind === 'team' ? 'Team' : kind === 'agents' ? 'Agents' : kind === 'thread' ? 'THREAD' : kind === 'agent' ? 'AGENT' : kind === 'artifact' ? 'FILE' : '';
+  const kindLabel = kind === 'task' ? 'Task' : kind === 'team' ? 'Team' : kind === 'thread' ? 'THREAD' : kind === 'agent' ? 'AGENT' : kind === 'artifact' ? 'FILE' : '';
   return createPortal(
     <aside className="context" aria-label="Context panel"><div className="inspector" data-inspector={kind}>
       {open && <div className="inspector-head">
@@ -366,15 +367,13 @@ function Inspector({
       <div className="inspector-tabs" role="tablist" aria-label="Inspector">
         <button type="button" aria-pressed={kind === 'task'} onClick={() => onKind('task')}>Task</button>
         <button type="button" aria-pressed={kind === 'team'} onClick={() => onKind('team')}>Team</button>
-        <button type="button" aria-pressed={kind === 'agents'} onClick={() => onKind('agents')}>Agents</button>
       </div>
       <div className="inspector-body" data-inspector-body={kind}>
-        {kind === 'closed' && <p className="inspector-empty">Pick a task, Team, Agents, or a thread.</p>}
+        {kind === 'closed' && <p className="inspector-empty">Pick a task, Team, or a thread.</p>}
         {kind === 'task' && (task
           ? <TaskDetail task={task} />
           : <p className="inspector-empty">Select a task to see its owner and definition of done.</p>)}
         {kind === 'team' && <Team room={room} />}
-        {kind === 'agents' && <RoomAgents room={room} onSelectAgent={onSelectAgent} />}
         {kind === 'agent' && (agent
           ? <AgentProfile agent={agent} room={room} role={role} onUpdated={onUpdatedAgent} />
           : <p className="inspector-empty">Select an agent to see its profile.</p>)}

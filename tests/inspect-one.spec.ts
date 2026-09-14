@@ -8,7 +8,7 @@ import { authedContext, seedSession, withAuth } from './auth';
 
 const apiUrl = 'http://127.0.0.1:3101/api';
 
-test('the inspector shows one of Task, Team, or Agents, and Close returns to empty', async ({ browser, request: raw }) => {
+test('the inspector shows Task or Team, Agents is a centre view, and Close removes the inspector', async ({ browser, request: raw }) => {
   const dir = mkdtempSync(join(tmpdir(), 'loop-inspect-one-'));
   const session = seedSession(join(dir, 'loop.sqlite'));
   const request = withAuth(raw, session.token);
@@ -43,7 +43,10 @@ test('the inspector shows one of Task, Team, or Agents, and Close returns to emp
     await expect(close).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Task', exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Team' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Agents' })).toBeVisible();
+    const views = page.getByRole('navigation', { name: 'Room views' });
+    await expect(views.getByRole('button')).toHaveText(['Chat', 'Tasks', 'Agents', 'Files']);
+    await expect(views.getByRole('button', { name: 'Chat' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('group', { name: 'Room details' }).getByRole('button')).toHaveText(['Team']);
     await page.screenshot({ path: resolve('docs/screenshots/inspect-one-closed.png') });
 
     await page.getByRole('button', { name: 'Team' }).click();
@@ -59,13 +62,15 @@ test('the inspector shows one of Task, Team, or Agents, and Close returns to emp
     await expect(agentsHeading).toHaveCount(0);
     await expect(close).toHaveCount(0);
 
-    await page.getByRole('button', { name: 'Agents' }).click();
-    await expect(page.getByRole('form', { name: 'Add agent' })).toBeVisible();
+    await views.getByRole('button', { name: 'Agents' }).click();
+    await expect(views.getByRole('button', { name: 'Agents' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('complementary', { name: 'Context panel' })).toHaveCount(0);
+    await expect(page.getByText('Add agent', { exact: true })).toBeVisible();
     await expect(agentsHeading).toHaveCount(1);
     await expect(teamHeading).toHaveCount(0);
-    await expect(close).toBeVisible();
+    await expect(close).toHaveCount(0);
 
-    await page.getByRole('button', { name: 'Tasks', exact: true }).click();
+    await views.getByRole('button', { name: 'Tasks', exact: true }).click();
     await page.getByRole('button', { name: 'inspect work' }).click();
     await expect(page.locator('.inspector-title')).toHaveText('inspect work');
     await expect(page.getByRole('region', { name: 'Task detail' })).toBeVisible();
@@ -78,6 +83,7 @@ test('the inspector shows one of Task, Team, or Agents, and Close returns to emp
     await expect(page.getByRole('button', { name: 'Task', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Team' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Agents' })).toBeVisible();
+    await expect(page.getByRole('tablist', { name: 'Inspector' }).getByRole('button')).toHaveText(['Task', 'Team']);
     await page.screenshot({ path: resolve('docs/screenshots/inspect-one-open.png') });
 
     await close.click();

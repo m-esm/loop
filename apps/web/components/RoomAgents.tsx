@@ -121,17 +121,20 @@ export default function RoomAgents({
             ? <button type="button" disabled={busy} onClick={() => { void remove(agent.id); }}>Remove</button>
             : null}
         </li>)}</ul>}
-      {owner && <form aria-label="Add agent" onSubmit={(event) => { void add(event); }}>
-        <label>Catalog
-          <select name="catalogId" required disabled={busy}>
-            {snapshot.catalog.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select>
-        </label>
-        <label>Name
-          <input name="name" required maxLength={100} pattern="[A-Za-z0-9_-]+" disabled={busy} />
-        </label>
-        <button type="submit" disabled={busy}>{busy ? 'Saving...' : 'Add'}</button>
-      </form>}
+      {owner && <details>
+        <summary>Add agent</summary>
+        <form aria-label="Add agent" onSubmit={(event) => { void add(event); }}>
+          <label>Catalog
+            <select name="catalogId" required disabled={busy}>
+              {snapshot.catalog.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+          </label>
+          <label>Name
+            <input name="name" required maxLength={100} pattern="[A-Za-z0-9_-]+" disabled={busy} />
+          </label>
+          <button type="submit" disabled={busy}>{busy ? 'Saving...' : 'Add'}</button>
+        </form>
+      </details>}
       {error && <p role="alert">{error}</p>}
     </section>
   );
