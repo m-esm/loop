@@ -123,6 +123,7 @@ test('a spawned child shows lineage, stays linked after send-back', async ({ bro
 
     await page.screenshot({ path: resolve('docs/screenshots/parent-task.png') });
 
+    await childCard.getByRole('button', { name: 'Add note', exact: true }).click();
     await childCard.getByLabel('Note').fill('tighten the split');
     const rejected = page.waitForResponse((response) => response.url().includes('/review') && response.request().method() === 'POST');
     await childCard.getByRole('button', { name: 'Reject', exact: true }).click();

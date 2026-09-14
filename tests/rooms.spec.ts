@@ -72,6 +72,7 @@ test('a message posted in one room does not appear in another', async ({ browser
     const page = await context.newPage();
     await page.goto('http://127.0.0.1:3100/?room=default');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
+    await page.getByRole('button', { name: 'New project' }).click();
     await page.getByLabel('Project name').fill('Klonk');
     await page.getByRole('button', { name: 'New project' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Klonk' })).toBeVisible();
@@ -115,6 +116,7 @@ test('the open room follows ?room=: create, reload, second tab, and unknown id',
     const page = await context.newPage();
     await page.goto('http://127.0.0.1:3100/?room=default');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
+    await page.getByRole('button', { name: 'New project' }).click();
     await page.getByLabel('Project name').fill('Klonk');
     await page.getByRole('button', { name: 'New project' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Klonk' })).toBeVisible();
@@ -166,6 +168,7 @@ test('a newly created room can run /task', async ({ browser, request: raw }) => 
     const page = await context.newPage();
     await page.goto('http://127.0.0.1:3100/?room=default');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
+    await page.getByRole('button', { name: 'New project' }).click();
     await page.getByLabel('Project name').fill('Klonk');
     await page.getByRole('button', { name: 'New project' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Klonk' })).toBeVisible();

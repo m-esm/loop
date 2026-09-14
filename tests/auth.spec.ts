@@ -51,7 +51,8 @@ test('login form then the room after login', async ({ browser, request }) => {
     await signIn.getByLabel('Password').fill(OPERATOR.password);
     await signIn.getByRole('button', { name: 'Sign in' }).click();
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
-    await expect(page.getByText(`Signed in as ${OPERATOR.displayName}`)).toBeVisible();
+    await expect(page.locator('.account-chrome')).toContainText(OPERATOR.displayName);
+    await expect(page.getByRole('navigation', { name: 'Room views' }).getByRole('button', { name: 'Log out' })).toHaveCount(0);
     const roomShot = resolve('/tmp/loop-auth-room.png');
     await page.screenshot({ path: roomShot });
 
@@ -67,6 +68,8 @@ test('login form then the room after login', async ({ browser, request }) => {
     );
     await collage.screenshot({ path: resolve('docs/screenshots/auth.png'), fullPage: true });
     await collage.close();
+    await page.getByRole('button', { name: 'Log out' }).click();
+    await expect(page.getByRole('form', { name: 'Sign in' })).toBeVisible();
   } finally {
     await Promise.all(contexts.map((item) => item.close()));
     await stopApi();

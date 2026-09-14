@@ -38,10 +38,10 @@ test('the inspector shows one of Task, Team, or Agents, and Close returns to emp
     await expect(agentsHeading).toHaveCount(0);
     await expect(page.getByRole('form', { name: 'Invite to room' })).toHaveCount(0);
     await expect(page.getByRole('form', { name: 'Add agent' })).toHaveCount(0);
-    await expect(empty).toHaveText('Pick a task, Team, Agents, or a thread.');
-    await expect(empty).toBeVisible();
+    await expect(empty).toHaveCount(0);
+    await expect(page.getByRole('complementary', { name: 'Context panel' })).toHaveCount(0);
     await expect(close).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Task', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Task', exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Team' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Agents' })).toBeVisible();
     await page.screenshot({ path: resolve('docs/screenshots/inspect-one-closed.png') });
@@ -54,7 +54,7 @@ test('the inspector shows one of Task, Team, or Agents, and Close returns to emp
     await expect(close).toBeInViewport({ ratio: 1 });
     await expect(page.locator('[data-inspector-body="team"]')).toBeInViewport({ ratio: 1 });
     await close.click();
-    await expect(empty).toBeVisible();
+    await expect(page.getByRole('complementary', { name: 'Context panel' })).toHaveCount(0);
     await expect(teamHeading).toHaveCount(0);
     await expect(agentsHeading).toHaveCount(0);
     await expect(close).toHaveCount(0);
@@ -81,7 +81,7 @@ test('the inspector shows one of Task, Team, or Agents, and Close returns to emp
     await page.screenshot({ path: resolve('docs/screenshots/inspect-one-open.png') });
 
     await close.click();
-    await expect(empty).toBeVisible();
+    await expect(page.getByRole('complementary', { name: 'Context panel' })).toHaveCount(0);
     await expect(page.getByRole('region', { name: 'Task detail' })).toHaveCount(0);
     await expect(teamHeading).toHaveCount(0);
     await expect(agentsHeading).toHaveCount(0);

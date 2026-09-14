@@ -99,6 +99,8 @@ test('a finished task can be accepted or rejected and sent back with a note', as
     // Visible is not reachable. A button half under the composer cannot be clicked.
     await expect(sendCard.getByRole('button', { name: 'Accept', exact: true })).toBeInViewport({ ratio: 1 });
     await expect(sendCard.getByRole('button', { name: 'Reject', exact: true })).toBeInViewport({ ratio: 1 });
+    await expect(sendCard.getByLabel('Note')).toHaveCount(0);
+    await sendCard.getByRole('button', { name: 'Reject', exact: true }).click();
     await expect(sendCard.getByLabel('Note')).toBeInViewport({ ratio: 1 });
 
     await page.screenshot({ path: resolve('docs/screenshots/result-card.png') });

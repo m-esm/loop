@@ -10,6 +10,7 @@ export default function TaskCard({ task, tasks = [] }: { task: Task; tasks?: Tas
   const waiting = task.status === 'needs_input' && !!task.question && !proposing;
   const [answer, setAnswer] = useState('');
   const [note, setNote] = useState('');
+  const [noteOpen, setNoteOpen] = useState(false);
   const [choice, setChoice] = useState(task.proposal?.pick ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -46,6 +47,7 @@ export default function TaskCard({ task, tasks = [] }: { task: Task; tasks?: Tas
       // A submitted note belongs to that verdict. Leaving it in the box means a
       // send-back note gets resubmitted with the next verdict on the re-run.
       setNote('');
+      setNoteOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Review could not be sent.');
     } finally { setBusy(false); }
@@ -142,12 +144,15 @@ export default function TaskCard({ task, tasks = [] }: { task: Task; tasks?: Tas
       {task.verdictNote ? `: ${task.verdictNote}` : ''}
     </p>}
     {terminal && !task.verdict && <form className="answer-form" onSubmit={submitReview}>
-      <label>Note<textarea value={note} onChange={(event) => setNote(event.target.value)}
-        rows={2} maxLength={8000} disabled={busy} /></label>
+      {noteOpen && <label>Note<textarea autoFocus value={note} onChange={(event) => setNote(event.target.value)}
+        rows={2} maxLength={8000} disabled={busy} /></label>}
       {error && <p role="alert">{error}</p>}
       <div className="review-actions">
         <button type="submit" name="accepted" disabled={busy}>Accept</button>
-        <button type="submit" name="rejected" disabled={busy}>Reject</button>
+        <button type="submit" name="rejected" disabled={busy} onClick={(event) => {
+          if (!noteOpen) { event.preventDefault(); setNoteOpen(true); }
+        }}>Reject</button>
+        <button type="button" aria-expanded={noteOpen} onClick={() => setNoteOpen(!noteOpen)} disabled={busy}>{noteOpen ? 'Hide note' : 'Add note'}</button>
       </div>
     </form>}
   </div>;

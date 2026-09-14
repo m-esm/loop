@@ -113,6 +113,13 @@ test('echo runner finishes /task without PATCH and fails FAIL: titles', async ({
     await expect.poll(() => foldedStatuses(events, failId)).toEqual(['queued', 'running', 'failed']);
     expect(failed.error).toBe('boom');
 
+    await expect(echoCardB.getByLabel('Note')).toHaveCount(0);
+    await echoCardB.locator('summary').click();
+    await tabB.getByRole('log').evaluate((element) => { element.scrollTop = 0; });
+    await expect(echoCardB.getByRole('heading', { name: 'Echo me' })).toBeInViewport({ ratio: 1 });
+    await expect(failCard.getByRole('button', { name: 'Reject', exact: true })).toBeInViewport({ ratio: 1 });
+    await expect(tabB.locator('.composer label')).toHaveCount(0);
+    await expect(tabB.getByRole('navigation', { name: 'Room views' }).getByRole('button', { name: 'Log out' })).toHaveCount(0);
     await tabB.screenshot({ path: resolve('docs/screenshots/room-chat.png') });
     await reader.cancel().catch(() => {});
     await pumping.catch(() => {});

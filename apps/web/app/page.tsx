@@ -8,11 +8,10 @@ export default function Page() {
     </aside>
     <main>
       <header><p className="muted" id="room-context">Home</p><h1 id="room-heading">Inbox</h1>
+        <div id="account-chrome" />
       </header>
       <Room />
     </main>
-    <aside className="context" aria-label="Context panel">
-      <div id="inspector" />
-    </aside>
+    <div id="inspector" />
   </div>;
 }

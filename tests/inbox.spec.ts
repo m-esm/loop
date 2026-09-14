@@ -55,7 +55,8 @@ test('Inbox stays home, orders cross-room parked work, opens Task detail, and up
     await expect(rows.nth(1)).toContainText(tasks[1].title);
     await expect(rows.nth(0)).toContainText('Launch');
     await expect(page.getByRole('complementary', { name: 'Projects', exact: true })).toBeVisible();
-    await expect(page.getByRole('complementary', { name: 'Context panel', exact: true })).toBeVisible();
+    await expect(page.getByRole('complementary', { name: 'Context panel', exact: true })).toHaveCount(0);
+    await expect(page.getByLabel('Project name')).toHaveCount(0);
     await page.screenshot({ path: resolve('docs/screenshots/inbox.png') });
     await rows.first().click();
     await expect(page).toHaveURL(`http://127.0.0.1:3100/?room=${room.id}`);
