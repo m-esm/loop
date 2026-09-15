@@ -507,3 +507,297 @@ test('Home renders no room activity toggle when the shut list already fits', asy
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+/**
+ * The derivation guard, and the defect it closes.
+ *
+ * The floor under both Home lists used to be a calc in globals.css that
+ * restated the rules on .inbox-row, .inbox-title and .inbox-sub term by term.
+ * It restated them, it did not read them, so the row's styling lived in two
+ * places and drifted apart in silence. The reproduction the reviewer ran is the
+ * body below: a direct `.inbox-title { font-size: 22px }` override moves the
+ * rendered pitch to about 75.69px while the transcribed calc stays at 64.89px,
+ * and both sections then floor roughly 11px below one row at 700, 560 and 500
+ * while every other spec in this file stays green, because the seeded depths
+ * leave enough slack at those heights to hide it.
+ *
+ * A custom property shared between the row rule and the calc would not catch
+ * this. The override is direct, it never touches a variable, so the shared
+ * version passes a tidy test and fails this one. What this asserts is that the
+ * floor MOVED: the list is at least the pitch of a row measured under the
+ * override, read off the page rather than written down here, so the only
+ * implementation that satisfies it is one that reads a rendered row.
+ *
+ * The queue depth is part of the instrument, not a detail. min-height is a
+ * floor, so a stale floor is invisible until the section is actually squeezed
+ * down onto it, and how hard it is squeezed is set by the queue above. At
+ * sixteen parked the activity list is handed 131.22px at 700 and 78.66px at
+ * 560, both already above a row, and only the 500 case reaches the floor and
+ * exposes it. At thirty two parked the queue is deep enough that the section
+ * sits on its floor at all three heights, which is where the transcribed calc
+ * pins the list to 64.89px against a row that needs 75.69px and the same case
+ * measures 75.69px once the floor is derived. So the depth is chosen to make
+ * the floor binding at every height this asserts, rather than at one of them.
+ *
+ * It also has to prove the measurement settles. This puts a second
+ * ResizeObserver on Home next to the activity overflow gate above, and one
+ * observer's write is the other's read: the pitch observer writes
+ * --inbox-row-measured, that moves the min-height of both lists, and resizing
+ * the activity list is exactly what the overflow observer watches for. So the
+ * console is captured and asserted free of "ResizeObserver loop completed with
+ * undelivered notifications", which is what Chromium emits when two observers
+ * thrash, and the published value is read twice with a wait between, after a
+ * viewport resize and again after a queue depth change arrives over SSE.
+ */
+test('Home floors both lists on the measured row pitch when a direct style override restyles the row', async ({ browser, request: raw }) => {
+  const dir = mkdtempSync(join(tmpdir(), 'loop-row-floor-derived-'));
+  const session = seedSession(join(dir, 'loop.sqlite'));
+  const request = withAuth(raw, session.token);
+  const apiUrl = 'http://127.0.0.1:3101/api';
+  let context: BrowserContext | undefined;
+  let output = '';
+  const api = spawn(process.execPath, ['dist/src/main.js'], {
+    cwd: resolve('apps/api'),
+    env: { ...process.env, PORT: '3101', WEB_ORIGIN: 'http://127.0.0.1:3100',
+      DATABASE_PATH: join(dir, 'loop.sqlite'), LOOP_RUNNER: '0' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  api.stdout?.on('data', (chunk) => { output += chunk; });
+  api.stderr?.on('data', (chunk) => { output += chunk; });
+  async function addTask(title: string, roomId: string): Promise<Task> {
+    const response = await request.post(`${apiUrl}/tasks`, {
+      data: { title, definitionOfDone: 'The human decision is recorded.', roomId },
+    });
+    expect(response.status()).toBe(201);
+    return await response.json() as Task;
+  }
+  async function addRoom(name: string): Promise<{ id: string; name: string }> {
+    const response = await request.post(`${apiUrl}/rooms`, { data: { name } });
+    expect(response.status()).toBe(201);
+    return await response.json() as { id: string; name: string };
+  }
+  async function park(task: Task) {
+    expect((await request.patch(`${apiUrl}/tasks/${task.id}/status`, { data: { status: 'needs_input' } })).ok()).toBeTruthy();
+  }
+  const tick = () => new Promise((done) => setTimeout(done, 25));
+  // The number the old calc laid out at, kept here only to prove this case is
+  // genuinely the drift case. The assertions below never floor against it; they
+  // floor against a pitch read off the page.
+  const transcribedPitch = 64.89;
+  try {
+    await expect.poll(async () => {
+      if (api.exitCode !== null) throw new Error(output);
+      return request.get(`${apiUrl}/rooms/default`).then((response) => response.status()).catch(() => 0);
+    }).toBe(200);
+
+    // Nine rooms, thirty two parked: the same shape the overflow cases above
+    // use, at the depth that presses both sections onto their floors at every
+    // height below, so the shut activity list clips and its toggle exists to be
+    // measured.
+    const made: Record<string, string> = { Loop: 'default' };
+    for (const name of ['Launch', 'Billing', 'Research', 'Design', 'Infra', 'Support', 'Docs', 'Quiet']) {
+      made[name] = (await addRoom(name)).id;
+    }
+    await addTask('Confirm the room copy', 'default');
+    await tick();
+    for (const name of ['Docs', 'Support', 'Infra']) {
+      await addTask(`Work in ${name}`, made[name]);
+      await tick();
+    }
+    for (const name of ['Design', 'Research', 'Billing', 'Launch']) {
+      for (let n = 0; n < 8; n += 1) {
+        await park(await addTask(`Approve the ${name} note ${n + 1}`, made[name]));
+        await tick();
+      }
+    }
+
+    context = await authedContext(browser, session.token);
+    const page = await context.newPage();
+
+    // Cheap instrumentation, test side only: every ResizeObserver the page
+    // constructs reports which element it delivered an entry for, so one resize
+    // can be attributed to the pitch observer (.inbox-row) and the activity
+    // overflow observer (.inbox-list) separately.
+    await page.addInitScript(() => {
+      const native = window.ResizeObserver;
+      const fires: string[] = [];
+      (window as unknown as { __roFires: string[] }).__roFires = fires;
+      window.ResizeObserver = class extends native {
+        constructor(callback: ResizeObserverCallback) {
+          super((entries, observer) => {
+            for (const entry of entries) fires.push(entry.target.className);
+            callback(entries, observer);
+          });
+        }
+      };
+    });
+    // Chromium reports observer thrash on the console rather than by throwing,
+    // so the console is the instrument. Page errors are collected with it.
+    const consoleErrors: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'error' || message.type() === 'warning') consoleErrors.push(message.text());
+    });
+    page.on('pageerror', (error) => { consoleErrors.push(error.message); });
+
+    const activity = page.getByRole('region', { name: 'Room activity', exact: true });
+    const activityRows = activity.locator('[data-activity-room]');
+    const list = page.locator('#room-activity-list');
+    const toggle = activity.getByRole('button', { name: /rooms?$/ });
+    const heading = activity.getByRole('heading', { name: 'Room activity', exact: true });
+    const inbox = page.getByRole('region', { name: 'Inbox', exact: true });
+    const queue = inbox.locator('.inbox-list');
+    const queueRows = inbox.locator('[data-task-id]');
+
+    async function extent(target: typeof list): Promise<number> {
+      const box = await target.boundingBox();
+      if (!box) throw new Error('the measured element has no box');
+      return box.y + box.height;
+    }
+    // The pitch a rendered row actually repeats at: its border box plus the
+    // margin that separates it from the next row, which is how every floor
+    // assertion in this file has always measured it.
+    const renderedPitch = () => activityRows.first().evaluate((el) =>
+      el.getBoundingClientRect().height + parseFloat(getComputedStyle(el).marginBottom));
+    // What the page published, read back off the container that carries it.
+    const publishedPitch = () => page.evaluate(() => {
+      const home = document.querySelector('main');
+      return home ? getComputedStyle(home).getPropertyValue('--inbox-row-measured').trim() : '';
+    });
+    const resetFires = () => page.evaluate(() => { (window as unknown as { __roFires: string[] }).__roFires.length = 0; });
+    const readFires = () => page.evaluate(() => (window as unknown as { __roFires: string[] }).__roFires.slice());
+    const atTop = async () => {
+      await page.evaluate(() => { const box = document.querySelector('main'); if (box) box.scrollTop = 0; });
+    };
+
+    await page.setViewportSize({ width: 1440, height: 700 });
+    await page.goto('http://127.0.0.1:3100/');
+    await expect(activity).toBeVisible();
+    await expect(activityRows).toHaveCount(9);
+    await expect(queueRows).toHaveCount(32);
+
+    // The reviewer's override: a direct rule on the title, touching no variable
+    // any calc could have been sharing. This is the whole point of the case.
+    await page.addStyleTag({ content: '.inbox-title { font-size: 22px }' });
+
+    for (const height of [700, 560, 500]) {
+      await page.setViewportSize({ width: 1440, height });
+      expect(page.viewportSize()?.height).toBe(height);
+      await expect(activity).toBeVisible();
+      await atTop();
+
+      const pitch = await renderedPitch();
+      // The override landed and moved the row past what the transcribed calc
+      // described. Without this the case could pass while proving nothing.
+      expect(pitch).toBeGreaterThan(transcribedPitch);
+
+      // The floor moved with it. On the transcribed calc the list floors at
+      // 64.89px while a row needs about 75.69px, so this is the assertion that
+      // separates a derived floor from a restated one.
+      await expect.poll(async () => {
+        const box = await list.boundingBox();
+        return box ? box.height : 0;
+      }).toBeGreaterThanOrEqual(pitch);
+      const queueBox = await queue.boundingBox();
+      if (!queueBox) throw new Error('the measured element has no box');
+      expect(queueBox.height).toBeGreaterThanOrEqual(pitch);
+
+      // Floored is only half of it. The section still has to be on screen, so
+      // the heading, the list and the only way out of the clipped list are all
+      // inside the viewport at the same time.
+      expect(await extent(heading)).toBeLessThanOrEqual(height);
+      expect(await extent(list)).toBeLessThanOrEqual(height);
+      await expect(toggle).toBeVisible();
+      expect(await extent(toggle)).toBeLessThanOrEqual(height);
+
+      // The published property tracks the rendered row rather than lagging it.
+      const published = await publishedPitch();
+      expect(parseFloat(published)).toBeCloseTo(pitch, 1);
+
+      // Settled, not merely correct once. Two observers share this page and a
+      // write by either is a read for the other, so the value has to be the
+      // same after the page has had time to thrash if it were going to.
+      await page.waitForTimeout(400);
+      expect(await publishedPitch()).toBe(published);
+      expect(await renderedPitch()).toBeCloseTo(pitch, 1);
+    }
+
+    // One resize, attributed per observer. This is the loop risk stated as a
+    // number rather than a hope, and the number is the reason the pair cannot
+    // fight: a viewport height change resizes the lists, not the row inside
+    // them, so the pitch observer is not even woken. It observes a row, whose
+    // box is a function of the row's own content and width, and the width here
+    // is fixed at 1440. The overflow observer answers the resize alone and its
+    // answer writes no custom property, so there is nothing to bounce back.
+    await resetFires();
+    await page.setViewportSize({ width: 1440, height: 640 });
+    await expect(activity).toBeVisible();
+    await page.waitForTimeout(400);
+    const fires = await readFires();
+    const pitchFires = fires.filter((name) => name.includes('inbox-row')).length;
+    const overflowFires = fires.filter((name) => name.includes('inbox-list')).length;
+    expect(pitchFires).toBe(0);
+    // The overflow gate is bounded too. At this depth both sections are already
+    // sitting on their floors, so a height change moves the queue between them
+    // and leaves the activity list at exactly one row: it is allowed to answer
+    // the resize and allowed to stay silent, but a thrashing pair runs into the
+    // hundreds here, and that is what this rules out.
+    expect(overflowFires).toBeLessThanOrEqual(8);
+
+    // A queue depth change over SSE, which is the case the activity overflow
+    // gate already handles and the one most likely to make the two observers
+    // argue: the queue grows, both sections are handed different amounts of
+    // room, and the row itself never changes size.
+    const settled = await publishedPitch();
+    await park(await addTask('Approve the late arrival', made.Launch));
+    await expect(queueRows).toHaveCount(33);
+    await page.waitForTimeout(400);
+    expect(await publishedPitch()).toBe(settled);
+    await page.waitForTimeout(300);
+    expect(await publishedPitch()).toBe(settled);
+
+    // The floor still holds at the shortest viewport after all of that.
+    await page.setViewportSize({ width: 1440, height: 500 });
+    await atTop();
+    const finalPitch = await renderedPitch();
+    await expect.poll(async () => {
+      const box = await list.boundingBox();
+      return box ? box.height : 0;
+    }).toBeGreaterThanOrEqual(finalPitch);
+    expect(await extent(toggle)).toBeLessThanOrEqual(500);
+
+    // The other direction, and the one that does wake the pitch observer:
+    // restyle the row itself while the page is up. This is the live drift the
+    // derivation exists to absorb, and it is where a loop would start if one
+    // were going to, because now the write really does change the min-heights
+    // that size the list the other observer is watching.
+    await resetFires();
+    await page.addStyleTag({ content: '.inbox-title { font-size: 26px }' });
+    await expect.poll(async () => parseFloat(await publishedPitch())).toBeGreaterThan(finalPitch);
+    await page.waitForTimeout(400);
+    const restyleFires = await readFires();
+    const restylePitchFires = restyleFires.filter((name) => name.includes('inbox-row')).length;
+    const restyleOverflowFires = restyleFires.filter((name) => name.includes('inbox-list')).length;
+    expect(restylePitchFires).toBeGreaterThan(0);
+    expect(restylePitchFires).toBeLessThanOrEqual(8);
+    expect(restyleOverflowFires).toBeLessThanOrEqual(8);
+    // It tracked the new row and then stopped moving, which is the epsilon
+    // guard in apps/web/lib/rowPitch.ts doing the work it is there for.
+    const restyled = await publishedPitch();
+    expect(parseFloat(restyled)).toBeCloseTo(await renderedPitch(), 1);
+    await page.waitForTimeout(400);
+    expect(await publishedPitch()).toBe(restyled);
+
+    // Chromium's thrash report, asserted absent. This is the second observer's
+    // licence to exist.
+    const loops = consoleErrors.filter((text) => /ResizeObserver loop/i.test(text));
+    expect(loops, `console reported observer thrash: ${loops.join(' | ')}`).toHaveLength(0);
+  } finally {
+    await context?.close();
+    if (api.exitCode === null) {
+      const exited = once(api, 'exit');
+      api.kill('SIGKILL');
+      await exited;
+    }
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
