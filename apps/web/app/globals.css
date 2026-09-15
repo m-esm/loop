@@ -322,9 +322,22 @@ nav .logout { margin-left: 12px; }
    takes the title slot, the newest touch takes the time slot, and the counts
    take the sub line. */
 .room-activity { padding-top: 32px; }
+/* The shut list owns its own box. main is already a 100vh flex column, so the
+   section claims the space the "Needs you" queue leaves and the list scrolls
+   inside it. That is what keeps the list bottom and the toggle on screen at any
+   queue depth and any viewport height, with no row count to tune. min-height:0
+   is what lets a flex item shrink past its content, the same idiom the Chat
+   section above already uses. */
+main > .room-activity { display: flex; flex-direction: column; min-height: 0; }
+main > .room-activity[data-expanded="false"] { flex: 1 1 auto; }
+main > .room-activity[data-expanded="false"] .inbox-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+/* Open is the opt in: natural height, and Home scrolls to reach the tail. */
+main > .room-activity[data-expanded="true"] { flex: 0 0 auto; }
 .room-activity-row:hover { border-color: var(--border); }
 .room-activity-name { color: var(--text); }
 .room-activity-summary { color: var(--secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-activity-toggle { margin-top: 4px; padding: 4px 10px; font-size: 12px; background: transparent; color: var(--secondary); }
+.room-activity-toggle[aria-expanded="true"] { background: var(--raised); }
 .auth-panel { width: 100%; max-width: 420px; padding-top: 12px; }
 .auth-panel > .muted { font-size: 13px; line-height: 1.6; }
 .auth-panel h2 { margin-bottom: 8px; }
