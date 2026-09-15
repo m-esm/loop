@@ -89,10 +89,13 @@ export default function RoomActivity({ tasks, rooms, onOpenRoom }: {
   // list capped to 40px by a direct style, the open click raced against a resize
   // in the same tick, a keyboard open during an SSE flood, and the tallest
   // viewport at which the shut list clips at all (1083, by 23px) then resized
-  // either side of that edge. The row count is not on that list because it
-  // cannot move: Room.tsx fetches /rooms once per authenticated attempt with no
-  // stream behind it, and the API has no room delete, so rooms neither arrive
-  // nor leave under a live page.
+  // either side of that edge. The row count is barely on that list, because it
+  // has almost no way to move: Room.tsx fetches /rooms once per authenticated
+  // attempt and nothing streams that list, so a room another client creates
+  // never arrives here, and the API has no room delete, so none ever leaves.
+  // The one path that does grow it is `createRoom` appending to local state in
+  // this tab, and that pushes straight to the new room, which unmounts this
+  // section and resets `open` with it.
   //
   // Keeping the disjunct also hid this guard from the suite: with it in place,
   // deleting this early return left all six room activity specs green, and
