@@ -1,10 +1,17 @@
-import { test, expect, type BrowserContext } from '@playwright/test';
+import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { once } from 'node:events';
 import { authedContext, seedSession, withAuth } from './auth';
+
+async function expandSteering(page: Page) {
+  const toggle = page.getByRole('group', { name: 'Room steering' }).getByRole('button', { name: 'Steering', exact: true });
+  await expect(toggle).toBeVisible();
+  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+}
 
 test('owners persist the verbosity dial, members cannot steer, and threads omit controls', async ({ browser, request: raw }) => {
   const dir = mkdtempSync(join(tmpdir(), 'loop-verbosity-browser-'));
@@ -32,12 +39,15 @@ test('owners persist the verbosity dial, members cannot steer, and threads omit 
     await page.goto('http://127.0.0.1:3100/?room=default');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
     const controls = page.getByRole('group', { name: 'Room steering', exact: true });
+    await expandSteering(page);
     await expect(controls.getByRole('button', { name: 'Normal', exact: true })).toHaveAttribute('aria-pressed', 'true');
     for (const label of ['Quiet', 'Verbose', 'Normal']) {
+      await expandSteering(page);
       await controls.getByRole('button', { name: label, exact: true }).click();
       await expect(controls.getByRole('button', { name: label, exact: true })).toHaveAttribute('aria-pressed', 'true');
       expect((await (await request.get(`${apiUrl}/rooms/default`)).json()).verbosity).toBe(label.toLowerCase());
       await page.reload();
+      await expandSteering(page);
       await expect(controls.getByRole('button', { name: label, exact: true })).toHaveAttribute('aria-pressed', 'true');
     }
     await page.getByLabel('Message', { exact: true }).fill('Keep progress quiet while we focus. Switch to Verbose to inspect every line.');
@@ -61,6 +71,7 @@ test('owners persist the verbosity dial, members cannot steer, and threads omit 
     contexts.push(memberContext);
     const memberPage = await memberContext.newPage();
     await memberPage.goto('http://127.0.0.1:3100/?room=default');
+    await expandSteering(memberPage);
     const memberControls = memberPage.getByRole('group', { name: 'Verbosity', exact: true });
     await expect(memberControls.getByRole('button', { name: 'Normal', exact: true })).toHaveAttribute('aria-pressed', 'true');
     for (const label of ['Quiet', 'Normal', 'Verbose']) {

@@ -52,7 +52,7 @@ aside { padding: 24px 16px; background: var(--panel); min-width: 0; }
 .inspector-body { flex: 1; overflow-y: auto; padding-top: 16px; }
 .inspector-empty { color: var(--secondary); font-size: 14px; }
 .inspector .task-detail { margin-top: 0; }
-main { padding: 24px 28px; min-width: 0; display: flex; flex-direction: column; height: 100vh; background: var(--ground); overflow-y: auto; }
+main { padding: 16px 28px 24px; min-width: 0; display: flex; flex-direction: column; height: 100vh; background: var(--ground); overflow-y: auto; }
 main > header { flex-shrink: 0; position: relative; padding-right: 180px; }
 #account-chrome { position: absolute; right: 0; top: 0; }
 .account-chrome { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--secondary); }
@@ -60,13 +60,13 @@ main > header { flex-shrink: 0; position: relative; padding-right: 180px; }
 .room-navigation { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--hairline); padding-bottom: 12px; flex-shrink: 0; }
 .room-navigation nav { flex: 1; border: 0; padding: 0; }
 .room-tools { display: flex; gap: 4px; }
-main > header .muted { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 4px; }
+main > header .muted { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 0; line-height: 1.2; }
 /* The chat section owns the leftover height so the transcript can never overlap
    the composer. A hardcoded transcript height guesses the composer's size and
    clipped the answer form under it. */
 main > section[aria-label="Chat"] { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 h1, h2, h3, p { margin-top: 0; }
-h1 { font-size: 20px; line-height: 1.25; letter-spacing: -.02em; margin-bottom: 8px; font-weight: 600; }
+h1 { font-size: 20px; line-height: 1.25; letter-spacing: -.02em; margin-bottom: 4px; font-weight: 600; }
 /* The rail wordmark is not a heading: the room's h1 already names the project,
    and two "Loop" headings read as two landmarks to a screen reader. */
 .brand { font-size: 22px; letter-spacing: -.02em; font-weight: 600; margin-bottom: 24px; }
@@ -168,7 +168,7 @@ th, td { padding: 14px 8px; border-bottom: 1px solid var(--hairline); vertical-a
   line-height: 1;
 }
 .inspector-thread { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
-.inspector-thread .composer { margin-bottom: 0; padding: 12px; }
+.inspector-thread .composer { margin-bottom: 0; padding: 12px; grid-template-columns: minmax(0, 1fr) auto; }
 .chat-task { border-left: 2px solid var(--border); padding-left: 14px; }
 .chat-task.question-card {
   background: var(--alert-soft);
@@ -277,16 +277,20 @@ th, td { padding: 14px 8px; border-bottom: 1px solid var(--hairline); vertical-a
 .proposal-options .proposal-option input[type="radio"] { flex: 0 0 auto; width: 16px; height: 16px; margin: 0; }
 .review-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .review-actions button { font-size: 12px; padding: 5px 10px; }
-.composer { margin-bottom: 0; flex-shrink: 0; gap: 8px; background: var(--surface); border-color: var(--border); border-radius: var(--radius-panel); box-shadow: var(--shadow-composer); }
+.composer { margin-bottom: 0; flex-shrink: 0; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; padding: 10px 12px; background: var(--surface); border-color: var(--border); border-radius: var(--radius-panel); box-shadow: var(--shadow-composer); }
 .composer textarea { background: transparent; border: 0; padding: 0; resize: vertical; max-height: 30vh; }
 .composer > .muted { font-size: 12px; }
-.composer .composer-hint { font-size: 11px; line-height: 1.8; }
+.composer .composer-hint { font-size: 11px; line-height: 1.3; align-self: center; margin: 0; }
 .composer:focus-within { border-color: var(--accent); }
-.composer-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.composer-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0; }
 .room-steering { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; border-left: 1px solid var(--hairline); padding-left: 12px; }
 .room-steering button { background: transparent; font-size: 12px; }
+.room-steering-toggle { padding: 4px 10px; }
+.room-steering-toggle[aria-expanded="true"] { background: var(--raised); }
+.room-steering-panel { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.room-steering-panel[hidden] { display: none; }
 .room-steering .muted { font-size: 12px; }
-.verbosity-dial { display: flex; gap: 2px; border: 1px solid var(--hairline); border-radius: 6px; padding: 2px; }
+.verbosity-dial { display: flex; gap: 2px; border: 1px solid var(--hairline); border-radius: var(--radius-small); padding: 2px; }
 .verbosity-dial button[aria-pressed="true"] { background: var(--hairline); }
 .composer .wide { grid-column: 1 / -1; margin: 0; }
 nav button[aria-pressed="true"] { background: var(--accent-soft); color: var(--text); border-color: var(--accent); }

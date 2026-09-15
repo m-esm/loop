@@ -1,4 +1,4 @@
-import { test, expect, type BrowserContext } from '@playwright/test';
+import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -8,6 +8,13 @@ import type { RoomSummary, Task } from '@loop/types';
 import { authedContext, seedSession, withAuth } from './auth';
 
 const apiUrl = 'http://127.0.0.1:3101/api';
+
+async function expandSteering(page: Page) {
+  const toggle = page.getByRole('group', { name: 'Room steering' }).getByRole('button', { name: 'Steering', exact: true });
+  await expect(toggle).toBeVisible();
+  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+}
 
 test('room steering persists, pauses the runner, wraps up one turn, and stays out of threads', async ({ browser, request: raw }) => {
   const dir = mkdtempSync(join(tmpdir(), 'loop-steering-browser-'));
@@ -40,6 +47,7 @@ test('room steering persists, pauses the runner, wraps up one turn, and stays ou
     await page.goto('http://127.0.0.1:3100/?room=default');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
     const controls = page.getByRole('group', { name: 'Room steering' });
+    await expandSteering(page);
     await expect(controls.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled();
     await page.getByLabel('Message', { exact: true }).fill('Keep this pass focused on a concrete result.');
     await page.getByLabel('Message', { exact: true }).press('Enter');
@@ -52,6 +60,7 @@ test('room steering persists, pauses the runner, wraps up one turn, and stays ou
     const state = async () => (await (await request.get(`${apiUrl}/rooms/default`)).json()) as RoomSummary;
     expect((await state()).paused).toBe(true);
     await page.reload();
+    await expandSteering(page);
     await expect(controls.getByRole('button', { name: 'Resume' })).toBeEnabled();
     await controls.getByRole('button', { name: 'Wrap up' }).click();
     await expect(controls).toContainText('Wrap up queued.');
@@ -98,6 +107,7 @@ test('room steering persists, pauses the runner, wraps up one turn, and stays ou
     const memberPage = await memberContext.newPage();
     await memberPage.goto('http://127.0.0.1:3100/?room=default');
     const memberControls = memberPage.getByRole('group', { name: 'Room steering' });
+    await expandSteering(memberPage);
     await expect(memberControls.getByRole('button', { name: 'Pause', exact: true })).toBeDisabled();
     await expect(memberControls.getByRole('button', { name: 'Wrap up' })).toBeDisabled();
 

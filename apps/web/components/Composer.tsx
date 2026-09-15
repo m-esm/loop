@@ -37,9 +37,9 @@ export default function Composer({
           event.currentTarget.form?.requestSubmit();
         }
       }} />
-    <p className="muted wide composer-hint"><kbd>Enter</kbd> to send. <kbd>Shift+Enter</kbd> for a new line. <code>/task Title :: Done when</code></p>
+    <p className="muted composer-hint"><kbd>Enter</kbd> to send. <kbd>Shift+Enter</kbd> for a new line. <code>/task Title :: Done when</code></p>
     {error && <p className="wide" role="alert">{error}</p>}
-    <div className="composer-actions wide">
+    <div className="composer-actions">
       <button type="submit" disabled={busy}>{busy ? 'Sending...' : 'Send'} <kbd aria-hidden="true">↵</kbd></button>
       {!parentId && <RoomSteering key={roomId} roomId={roomId} />}
     </div>
