@@ -961,12 +961,13 @@ test('Home keeps the room activity toggle through resize, queue depth and row re
     await expect(queueRows).toHaveCount(4);
     await stillTheWayBack('queue shrunk back to four over SSE while open');
 
-    // Rooms created while the page is up are not a perturbation of this list at
+    // Rooms created by another client are not a perturbation of this list at
     // all, and that is worth holding still rather than assuming: Room.tsx
-    // fetches /rooms once per authenticated attempt and no stream updates it, so
-    // six new rooms leave the rendered row count where it was. The row count
-    // cannot move under an open list without a reload, which is one of the
-    // reasons `overflows` has nothing that can rewrite it here.
+    // fetches /rooms once per authenticated attempt and nothing streams that
+    // list, so six rooms created over the API leave the rendered row count where
+    // it was. The only path that grows it is `createRoom` appending to local
+    // state in this tab, and that pushes straight to the new room and unmounts
+    // this section, so it cannot move the count under an open list either.
     for (let n = 0; n < 6; n += 1) { await addRoom(`Surge ${n + 1}`); await tick(); }
     await page.waitForTimeout(500);
     await expect(rows).toHaveCount(9);
