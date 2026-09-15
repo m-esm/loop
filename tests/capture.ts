@@ -1,4 +1,5 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import type { Locator, Page } from '@playwright/test';
 
@@ -20,6 +21,14 @@ export async function captureFlow(
     height: window.innerHeight,
     text: (document.body.innerText || '').replace(/\s+/g, ' ').trim(),
   }));
+  // Bind the claim to this exact file. Without it the sidecar describes a
+  // screen that the PNG beside it need not be a picture of: a solid-black
+  // frame and an older commit's capture both keep a current sidecar honest.
+  // This is a hash of the bytes just written, never a re-render, so no
+  // renderer enters the comparison.
+  const png = readFileSync(file);
+  const bytes = png.byteLength;
+  const sha256 = createHash('sha256').update(png).digest('hex');
   mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file.replace(/\.png$/, '.json'), `${JSON.stringify(facts, null, 2)}\n`);
+  writeFileSync(file.replace(/\.png$/, '.json'), `${JSON.stringify({ ...facts, bytes, sha256 }, null, 2)}\n`);
 }

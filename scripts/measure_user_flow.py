@@ -17,8 +17,13 @@ So a capture counts when the PNG decodes, its pixel dimensions match the
 viewport its spec rendered at, and the text on screen at capture time says
 this is that screen. Every one of those facts comes from the DOM or the file
 header, so the answer does not depend on which machine rendered it.
+
+The sidecar also carries the PNG's own sha256, written at capture time in the
+same commit. That binds the claim to the file: a valid PNG of the wrong pixels
+or a blob from an older commit keeps a current sidecar honest otherwise.
 """
 from pathlib import Path
+import hashlib
 import json
 import struct
 import sys
@@ -77,6 +82,16 @@ def failures(name: str, rule: dict) -> "list[str]":
         return [f"{name}: no capture facts beside it; the spec must use captureFlow()"]
     facts = json.loads(facts_file.read_text())
     bad = []
+    # The sidecar describes a screen; this proves the PNG beside it is that
+    # screen's capture. A solid-black frame of the right size and an older
+    # commit's blob both satisfy every other rule here. The hash is compared
+    # against one written at capture time in the same commit, never against a
+    # re-render, so no renderer enters the comparison.
+    data = png.read_bytes()
+    if facts.get("sha256") != hashlib.sha256(data).hexdigest():
+        bad.append(f"{name}: PNG does not match the capture facts beside it; recapture it")
+    elif facts.get("bytes") != len(data):
+        bad.append(f"{name}: PNG is {len(data)} bytes, facts say {facts.get('bytes')}")
     want = tuple(rule["size"])
     if size != want:
         bad.append(f"{name}: {size[0]}x{size[1]} pixels, expected {want[0]}x{want[1]}")
