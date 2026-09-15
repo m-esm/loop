@@ -317,14 +317,23 @@ nav .logout { margin-left: 12px; }
 .inbox-empty-body { font-size: 13px; line-height: 1.6; margin-bottom: 16px; }
 .inbox-empty-action { font-size: 13px; background: var(--accent); border-color: transparent; color: var(--text); }
 .inbox-empty-action:hover:not(:disabled) { background: var(--accent-hover); border-color: transparent; }
-/* One row of either Home list, in the terms the row above is declared in
-   rather than a number measured once and pasted back: 1px of border top and
-   bottom, 10px of padding top and bottom, the title line (.inbox-title, 14px
-   at line-height 1.35), the 2px grid row gap, the sub line (.inbox-sub, 12px
-   at the root line-height 1.5), and the 4px that separates one row from the
-   next. Chromium lays that out at 64.89px, which is the pitch a rendered list
-   actually repeats at, so the floor below is one whole row rather than a
-   rounded guess. Restyle the row and the floor follows it. */
+/* One row of either Home list, transcribed from the terms the row above is
+   declared in: 1px of border top and bottom, 10px of padding top and bottom,
+   the title line (.inbox-title, 14px at line-height 1.35), the 2px grid row
+   gap, the sub line (.inbox-sub, 12px at the root line-height 1.5), and the 4px
+   that separates one row from the next. Chromium lays that out at 64.89px,
+   which is the pitch a rendered list actually repeats at, so the floor below is
+   one whole row rather than a rounded guess.
+
+   Transcribed is the load bearing word. This calc restates those rules, it does
+   not read them, so the row's styling lives in two places and they can drift
+   apart silently: set .inbox-title to 22px and the rendered pitch becomes
+   75.69px while this stays 64.89px, and the list clips below one row at 700,
+   560 and 500 with every spec still green, because the seeded depths leave
+   enough room at those heights to hide it. So change a row rule and change this
+   calc in the same commit. Deriving the floor from one measured source is a
+   slice of its own; tests/inbox-activity.spec.ts already reads the pitch off a
+   rendered row rather than trusting this number. */
 :root {
   --inbox-row: calc(2px + 20px + (14px * 1.35) + 2px + (12px * 1.5) + 4px);
   /* The heading over either list: .inbox h2 at 14px on the root line-height,
