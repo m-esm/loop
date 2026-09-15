@@ -27,8 +27,11 @@ test('owner invites, invitee registers with the token, lands as a member of that
     await page.getByRole('button', { name: 'New project' }).click();
     await expect(page.locator('#room-context')).toHaveText('Klonk');
     await page.getByRole('button', { name: 'Team' }).click();
+    await expect(page.getByRole('region', { name: 'Team' })).toBeVisible();
     const form = page.getByRole('form', { name: 'Invite to room' });
     await expect(form).toBeVisible();
+    await expect(form.locator('option[value="member"]')).toHaveText('Member');
+    await expect(form.locator('option[value="owner"]')).toHaveText('Owner');
     await form.getByLabel('Email').fill('ada@x.com');
     await form.getByLabel('Role').selectOption('member');
     await form.getByRole('button', { name: 'Invite' }).click();

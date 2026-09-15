@@ -39,9 +39,12 @@ test('Board uses every shared status, updates live, opens the inspector, and tog
     await expect(panel.getByRole('form', { name: 'Create task' })).toBeVisible();
     await panel.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(panel.getByRole('button', { name: 'Board', exact: true })).toHaveAttribute('aria-pressed', 'true');
-    await expect(board.locator('[data-task-status]')).toHaveCount(TASK_STATUSES.length);
-    expect(await board.locator('[data-task-status]').evaluateAll((columns) => columns.map((column) => column.getAttribute('data-task-status')))).toEqual(TASK_STATUSES);
-    await expect(board.getByText('No tasks', { exact: true })).toHaveCount(TASK_STATUSES.length);
+    await expect(board).toHaveCount(0);
+    await expect(panel.getByText('No tasks yet', { exact: true })).toBeVisible();
+    await expect(panel.getByRole('button', { name: 'Create a task', exact: true })).toBeVisible();
+    await panel.getByRole('button', { name: 'Create a task', exact: true }).click();
+    await expect(panel.getByRole('form', { name: 'Create task' })).toBeVisible();
+    await panel.getByRole('button', { name: 'Cancel', exact: true }).click();
 
     const tasks = [];
     for (const title of ['Polish task ownership', 'Ship the room foundation']) {
@@ -51,6 +54,7 @@ test('Board uses every shared status, updates live, opens the inspector, and tog
       expect(response.status()).toBe(201);
       tasks.push(await response.json());
     }
+    await expect(board.locator('[data-task-status]')).toHaveCount(TASK_STATUSES.length);
     const queuedColumn = board.locator('[data-task-status="queued"]');
     const doneColumn = board.locator('[data-task-status="done"]');
     await expect(queuedColumn.locator('[data-task-id]')).toHaveCount(2);

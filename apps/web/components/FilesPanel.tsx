@@ -106,7 +106,7 @@ export default function FilesPanel({ room, files, onChange, onSelectFile }: {
     setChosen(file.name);
   }
 
-  return <section aria-label="Files">
+  return <section aria-label="Files" data-empty={files.length ? undefined : "1"}>
     <form
       className={`files-upload${dragging ? ' dragging' : ''}`}
       aria-label="Upload file"
@@ -134,6 +134,9 @@ export default function FilesPanel({ room, files, onChange, onSelectFile }: {
         <a href={`${API_URL}/rooms/${file.roomId}/files/${file.id}/content`} download={file.name}>Download</a>
       </li>)}
     </ul>
-    {!files.length && <p className="muted files-empty">No files yet. Drop one above to share it with this room and its agents.</p>}
+    {!files.length && <div className="files-empty">
+      <p className="inbox-empty-title">No files yet</p>
+      <p className="inbox-empty-body">Drop a file on the zone above to share it with this room and its agents.</p>
+    </div>}
   </section>;
 }
