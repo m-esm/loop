@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { isRunningStatus, relativeAgo, type RoomSummary, type Task } from '@loop/types';
 import { needsHumanCount } from '../lib/feed';
 
@@ -19,10 +19,16 @@ import { needsHumanCount } from '../lib/feed';
  *
  * So the list bounds its own box instead of counting rows. While it is shut
  * the section takes the space the queue leaves (`flex: 1 1 auto`) and the list
- * scrolls inside it, which puts the list bottom and the toggle inside the
- * viewport at every queue depth and every viewport height, with no constant to
- * tune. Opening it gives the list its natural height and lets Home scroll,
- * which is the opt in the reviewer approved.
+ * scrolls inside it. What that buys is narrower than it first looked: the list
+ * bottom stops depending on queue depth as long as the queue itself fits on
+ * the page, with no constant to tune. It is not a promise about every queue
+ * depth. The "Needs you" queue above is unbounded, so once the queue overflows
+ * the page it carries this section off with it: at sixteen parked tasks the
+ * whole section sits below the fold (list y=1254.9, toggle bottom 1286.9) at
+ * 1440x900, 900x800 and 1440x700 alike. Bounding that queue is the agreed
+ * follow up slice, and it is the only thing that can fix that case. Opening
+ * the list gives it its natural height and lets Home scroll, which is the opt
+ * in the reviewer approved.
  */
 
 function summarise(total: number, active: number, waiting: number): string {
@@ -41,6 +47,10 @@ export default function RoomActivity({ tasks, rooms, onOpenRoom }: {
 }) {
   const [open, setOpen] = useState(false);
   const listId = 'room-activity-list';
+  const listRef = useRef<HTMLOListElement | null>(null);
+  // False until the list has been measured, so the first paint renders no
+  // toggle and nothing flashes in and back out again.
+  const [overflows, setOverflows] = useState(false);
   // Newest touched room first; a room nobody has used yet sorts last on ''.
   const rows = rooms.map((room) => {
     const owned = tasks.filter((task) => task.roomId === room.id);
@@ -55,9 +65,37 @@ export default function RoomActivity({ tasks, rooms, onOpenRoom }: {
   // Every room renders in both states. Shut, the list is a scrolling box; open,
   // it runs to its natural height. Nothing is held back either way, so the
   // label counts rooms rather than a hidden remainder it would have to measure.
+  //
+  // Whether there is anything to reveal is a fact about the rendered box, not
+  // about the row count, so it is measured rather than guessed: a list that
+  // already fits shows every room it names and a toggle over it would promise
+  // rooms it is displaying already. The measurement has to be taken against the
+  // shut state. Open, the section is `flex: 0 0 auto` and the list runs to its
+  // natural height, so it never scrolls and `scrollHeight > clientHeight` reads
+  // false; gating on the live reading would delete the control while the human
+  // is inside it and strand them in the expanded state with no way back. So the
+  // effect declines to re-measure while open, holding the last shut reading,
+  // and the render keeps the control whenever the list is open.
+  const shape = rows.map((row) => `${row.room.id}:${row.total}:${row.active}:${row.waiting}`).join('|');
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const measure = () => {
+      if (open) return;
+      setOverflows(list.scrollHeight > list.clientHeight);
+    };
+    // Runs after the DOM is in place, so these read the laid out box. The
+    // observer covers viewport resize and any queue depth change above that
+    // hands this section a different amount of room; `shape` covers room and
+    // task data changing under a box that keeps its size.
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
+    return () => { observer.disconnect(); };
+  }, [open, shape]);
   return <section aria-label="Room activity" className="inbox room-activity" data-expanded={open}>
     <h2>Room activity</h2>
-    <ol id={listId} className="inbox-list">
+    <ol id={listId} ref={listRef} className="inbox-list">
       {rows.map((row) => <li key={row.room.id}>
         {/* The rail owns data-room. This list is a second surface for the same
             rooms, so it carries its own attribute and a rail query stays exact. */}
@@ -73,10 +111,14 @@ export default function RoomActivity({ tasks, rooms, onOpenRoom }: {
         </button>
       </li>)}
     </ol>
-    {/* The escape hatch out of the shut list's scrolling box. Its label reads
-        straight off the room count, so it stays honest without measuring
-        anything. Same disclosure idiom as the Steering toggle. */}
-    {rows.length > 1 && <button type="button" className="room-activity-toggle"
+    {/* The escape hatch out of the shut list's scrolling box, so it renders
+        only when the shut list actually clips something. `open ||` is the way
+        back: it keeps the control rendered for as long as the list is open,
+        where the overflow condition is false by construction. The label reads
+        straight off the room count, and once the list is known to clip, every
+        room it names is one the human cannot see all of at once. Same
+        disclosure idiom as the Steering toggle. */}
+    {(open || overflows) && <button type="button" className="room-activity-toggle"
       aria-expanded={open} aria-controls={listId}
       onClick={() => { setOpen((value) => !value); }}>
       {open ? 'Show fewer rooms' : `Show all ${rows.length} rooms`}

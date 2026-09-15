@@ -248,8 +248,11 @@ async function keepsActivityListInsideViewport(
 
         // The render barrier, true whether the list bounds its own box or renders
         // a fixed number of rows, so reverting the fix fails on an extent below
-        // rather than timing out here.
+        // rather than timing out here. This seed is the overflowing one, so the
+        // gated control has to be here: a clipped list with no way to open it is
+        // the mirror of the bug the gate exists to fix.
         await expect(toggle).toBeVisible();
+        await expect(toggle).toHaveCount(1);
 
         // The assertions the fix exists to satisfy, ahead of every count and
         // label: where the shut list ends, and where its only escape hatch ends.
@@ -282,16 +285,27 @@ async function keepsActivityListInsideViewport(
         await expect(toggle).toHaveAttribute('aria-expanded', 'true');
         await expect(toggle).toHaveText('Show fewer rooms');
         await expect(rows).toHaveCount(9);
+        // The trap, pinned. Open, the list runs to its natural height and stops
+        // scrolling, so the very condition that revealed this control now reads
+        // false. A gate on the live reading would delete the human's only way
+        // back while they are standing in the expanded state, so the control has
+        // to survive its own gate going false.
+        expect(await list.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(false);
+        await expect(toggle).toHaveCount(1);
+        await expect(toggle).toBeVisible();
         await atTop();
         expect(await extent(rows.last())).toBeGreaterThan(viewport.height);
         for (const [index, name] of order.entries()) {
           await expect(rows.nth(index)).toHaveAttribute('data-activity-room', made[name]);
         }
 
-        // Shutting it again restores the bounded box at the same viewport.
+        // Shutting it again restores the bounded box at the same viewport, which
+        // is only reachable because the control stayed rendered while open.
         await toggle.click();
         await expect(toggle).toHaveAttribute('aria-expanded', 'false');
         await expect(toggle).toHaveText('Show all 9 rooms');
+        await expect(toggle).toHaveCount(1);
+        expect(await list.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
         await atTop();
         expect(await extent(list)).toBeLessThanOrEqual(viewport.height);
         expect(await extent(toggle)).toBeLessThanOrEqual(viewport.height);
@@ -314,4 +328,96 @@ test('Home keeps the room activity list and its toggle inside the viewport with 
 
 test('Home keeps the room activity list and its toggle inside the viewport with an eight deep queue', async ({ browser, request }) => {
   await keepsActivityListInsideViewport({ parked: 8, parkPerRoom: 2 }, browser, request);
+});
+
+/**
+ * The other half of the gate, and the review that produced it. A control that
+ * always rendered read "Show all 2 rooms" over a list already showing both of
+ * them: the shut list measured scrollHeight 533 against clientHeight 533, so
+ * nothing was clipped and clicking revealed nothing, 2 rows before and 2 after.
+ * Its only effect was shrinking the section from 533.2px to 129.8px, because
+ * open drops the section to its natural height. So this pins the empty case the
+ * reviewer measured: when the shut list fits, no toggle exists to lie about it.
+ */
+test('Home renders no room activity toggle when the shut list already fits', async ({ browser, request: raw }) => {
+  const dir = mkdtempSync(join(tmpdir(), 'loop-activity-fits-'));
+  const session = seedSession(join(dir, 'loop.sqlite'));
+  const request = withAuth(raw, session.token);
+  const apiUrl = 'http://127.0.0.1:3101/api';
+  let context: BrowserContext | undefined;
+  let output = '';
+  const api = spawn(process.execPath, ['dist/src/main.js'], {
+    cwd: resolve('apps/api'),
+    env: { ...process.env, PORT: '3101', WEB_ORIGIN: 'http://127.0.0.1:3100',
+      DATABASE_PATH: join(dir, 'loop.sqlite'), LOOP_RUNNER: '0' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  api.stdout?.on('data', (chunk) => { output += chunk; });
+  api.stderr?.on('data', (chunk) => { output += chunk; });
+  try {
+    await expect.poll(async () => {
+      if (api.exitCode !== null) throw new Error(output);
+      return request.get(`${apiUrl}/rooms/default`).then((response) => response.status()).catch(() => 0);
+    }).toBe(200);
+
+    // Two rooms and an empty queue, exactly the reviewer's seed. The one task is
+    // left running rather than parked on a human, so the "Needs you" queue above
+    // stays empty and the section gets the whole column to grow into.
+    const launchResponse = await request.post(`${apiUrl}/rooms`, { data: { name: 'Launch' } });
+    expect(launchResponse.status()).toBe(201);
+    const launch = await launchResponse.json() as { id: string };
+    const response = await request.post(`${apiUrl}/tasks`, {
+      data: { title: 'Choose the release scope', definitionOfDone: 'The human decision is recorded.', roomId: launch.id },
+    });
+    expect(response.status()).toBe(201);
+    const running = await response.json() as Task;
+    expect((await request.patch(`${apiUrl}/tasks/${running.id}/status`, { data: { status: 'running' } })).ok()).toBeTruthy();
+
+    context = await authedContext(browser, session.token);
+    const page = await context.newPage();
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('http://127.0.0.1:3100/');
+    const activity = page.getByRole('region', { name: 'Room activity', exact: true });
+    const rows = activity.locator('[data-activity-room]');
+    const list = page.locator('#room-activity-list');
+    const toggle = activity.getByRole('button', { name: /rooms?$/ });
+    await expect(activity).toBeVisible();
+    expect(page.viewportSize()?.height).toBe(900);
+    // The queue is empty, so nothing above pushes this section down.
+    await expect(page.getByRole('region', { name: 'Inbox', exact: true }).locator('[data-task-id]')).toHaveCount(0);
+
+    // Both rooms render and both are on screen, so there is nothing to reveal.
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0)).toContainText('Launch');
+    await expect(rows.nth(1)).toContainText('Loop');
+    await expect(rows.nth(0)).toBeVisible();
+    await expect(rows.nth(1)).toBeVisible();
+
+    // The measurement the gate reads, at the state the gate is read in.
+    const fit = await list.evaluate((el) => ({ scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }));
+    expect(fit.scrollHeight).toBe(fit.clientHeight);
+
+    // So no control, rather than one promising rooms it is already showing.
+    await expect(toggle).toHaveCount(0);
+    await expect(activity.locator('.room-activity-toggle')).toHaveCount(0);
+    await expect(activity.locator('[aria-controls="room-activity-list"]')).toHaveCount(0);
+
+    // And with no control there is no click that can shrink the box: the section
+    // holds the height it laid out with rather than collapsing to its rows.
+    const before = await list.boundingBox();
+    if (!before) throw new Error('the measured element has no box');
+    await page.waitForTimeout(250);
+    const after = await list.boundingBox();
+    if (!after) throw new Error('the measured element has no box');
+    expect(after.height).toBe(before.height);
+    expect(after.y + after.height).toBeLessThanOrEqual(900);
+  } finally {
+    await context?.close();
+    if (api.exitCode === null) {
+      const exited = once(api, 'exit');
+      api.kill('SIGKILL');
+      await exited;
+    }
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
