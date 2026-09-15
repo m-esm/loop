@@ -25,7 +25,7 @@ test('owner invites, invitee registers with the token, lands as a member of that
     await page.getByRole('button', { name: 'New project' }).click();
     await page.getByLabel('Project name').fill('Klonk');
     await page.getByRole('button', { name: 'New project' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Klonk' })).toBeVisible();
+    await expect(page.locator('#room-context')).toHaveText('Klonk');
     await page.getByRole('button', { name: 'Team' }).click();
     const form = page.getByRole('form', { name: 'Invite to room' });
     await expect(form).toBeVisible();
@@ -54,9 +54,9 @@ test('owner invites, invitee registers with the token, lands as a member of that
     await register.getByLabel('Password').fill('password1');
     await register.getByRole('button', { name: 'Create account' }).click();
     await expect(inviteePage.locator('[data-live]')).toHaveAttribute('data-live', '1');
-    await expect(inviteePage.getByRole('heading', { level: 1, name: 'Klonk' })).toBeVisible();
+    await expect(inviteePage.locator('#room-context')).toHaveText('Klonk');
     await expect(inviteePage.getByRole('button', { name: 'Klonk' })).toHaveAttribute('aria-current', 'page');
-    await expect(inviteePage.getByRole('heading', { level: 1, name: 'Loop' })).toHaveCount(0);
+    await expect(inviteePage.locator('#room-context')).not.toHaveText('Loop');
     await inviteePage.getByLabel('Message', { exact: true }).fill('hello from invitee');
     await inviteePage.getByRole('button', { name: 'Send' }).click();
     await expect(inviteePage.locator('.message-card').filter({ hasText: 'hello from invitee' })).toBeVisible();

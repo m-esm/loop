@@ -60,6 +60,11 @@ export default function Transcript({ messages, tasks, files = [], onOpenThread, 
       const element = event.currentTarget;
       follow.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
     }}>
+    {/* margin-top:auto on this wrapper pins a short conversation to the
+        bottom, beside the composer, instead of stranding it under the tabs
+        with the rest of the pane empty. A full transcript overflows and
+        scrolls exactly as before. */}
+    <div className="transcript-stream">
     {!roots.length && <p className="muted">Start the conversation, or use /task to create a task here.</p>}
     {roots.map((message) => <MessageCard key={message.id} message={message} tasks={tasks}
       task={message.body.kind === 'task' ? byId.get(message.body.taskId) : undefined}
@@ -67,5 +72,6 @@ export default function Transcript({ messages, tasks, files = [], onOpenThread, 
       replyCount={replyCounts.get(message.id) ?? 0}
       participants={replyAuthors.get(message.id) ?? []}
       onOpenThread={onOpenThread} onOpenArtifact={onOpenArtifact} />)}
+    </div>
   </div>;
 }

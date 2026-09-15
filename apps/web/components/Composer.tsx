@@ -1,14 +1,15 @@
 'use client';
 
 import { useRef, useState, type FormEvent } from 'react';
-import { parseComposer } from '@loop/types';
+import { parseComposer, type RoomSummary } from '@loop/types';
 import { api } from '../lib/api';
 import RoomSteering from './RoomSteering';
 
 export default function Composer({
-  roomId, parentId = null, fieldId = 'room-message', label = 'Message',
+  roomId, parentId = null, fieldId = 'room-message', label = 'Message', onRoom,
 }: {
   author: string; roomId: string; parentId?: string | null; fieldId?: string; label?: string;
+  onRoom?: (room: RoomSummary) => void;
 }) {
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
@@ -41,7 +42,7 @@ export default function Composer({
     {error && <p className="wide" role="alert">{error}</p>}
     <div className="composer-actions">
       <button type="submit" disabled={busy}>{busy ? 'Sending...' : 'Send'} <kbd aria-hidden="true">↵</kbd></button>
-      {!parentId && <RoomSteering key={roomId} roomId={roomId} />}
+      {!parentId && <RoomSteering key={roomId} roomId={roomId} onRoom={onRoom} />}
     </div>
   </form>;
 }
