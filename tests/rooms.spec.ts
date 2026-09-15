@@ -75,7 +75,7 @@ test('a message posted in one room does not appear in another', async ({ browser
     await page.getByRole('button', { name: 'New project' }).click();
     await page.getByLabel('Project name').fill('Klonk');
     await page.getByRole('button', { name: 'New project' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Klonk' })).toBeVisible();
+    await expect(page.locator('#room-context')).toHaveText('Klonk');
     await expect(page).toHaveURL(/[?&]room=klonk(?:&|$)/);
     await expect(page.getByRole('button', { name: 'Klonk' })).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('button', { name: 'Loop' })).toHaveCount(1);
@@ -90,7 +90,7 @@ test('a message posted in one room does not appear in another', async ({ browser
     await expect(page.getByRole('button', { name: 'New project' })).toBeInViewport({ ratio: 1 });
     await page.screenshot({ path: resolve('docs/screenshots/projects-rail.png') });
     await page.getByRole('button', { name: 'Loop' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Loop' })).toBeVisible();
+    await expect(page.locator('#room-context')).toHaveText('Loop');
     await expect(page).toHaveURL(/[?&]room=default(?:&|$)/);
     await expect(page.locator('.message-card').filter({ hasText: 'only in klonk' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Klonk' }).click();
@@ -119,29 +119,29 @@ test('the open room follows ?room=: create, reload, second tab, and unknown id',
     await page.getByRole('button', { name: 'New project' }).click();
     await page.getByLabel('Project name').fill('Klonk');
     await page.getByRole('button', { name: 'New project' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Klonk' })).toBeVisible();
+    await expect(page.locator('#room-context')).toHaveText('Klonk');
     await expect(page).toHaveURL(/[?&]room=klonk(?:&|$)/);
     await page.reload();
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
-    await expect(page.getByRole('heading', { level: 1, name: 'Klonk' })).toBeVisible();
+    await expect(page.locator('#room-context')).toHaveText('Klonk');
     await expect(page.getByRole('button', { name: 'Klonk' })).toHaveAttribute('aria-current', 'page');
     await expect(page).toHaveURL(/[?&]room=klonk(?:&|$)/);
 
     const tab = await context.newPage();
     await tab.goto('http://127.0.0.1:3100/?room=klonk');
     await expect(tab.locator('[data-live]')).toHaveAttribute('data-live', '1');
-    await expect(tab.getByRole('heading', { level: 1, name: 'Klonk' })).toBeVisible();
+    await expect(tab.locator('#room-context')).toHaveText('Klonk');
     await expect(tab.getByRole('button', { name: 'Klonk' })).toHaveAttribute('aria-current', 'page');
 
     await page.goto('http://127.0.0.1:3100/?room=nope');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
-    await expect(page.getByRole('heading', { level: 1, name: 'Loop' })).toBeVisible();
+    await expect(page.locator('#room-context')).toHaveText('Loop');
     await expect(page.getByRole('button', { name: 'Loop' })).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByRole('heading', { level: 1 })).not.toHaveText('nope');
+    await expect(page.locator('#room-context')).not.toHaveText('nope');
 
     await page.goto('http://127.0.0.1:3100/?room=klonk');
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
-    await expect(page.getByRole('heading', { level: 1, name: 'Klonk' })).toBeVisible();
+    await expect(page.locator('#room-context')).toHaveText('Klonk');
     await expect(page.getByRole('button', { name: 'Klonk' })).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('button', { name: 'Klonk' })).toBeInViewport({ ratio: 1 });
     expect(page.url()).toMatch(/[?&]room=klonk(?:&|$)/);
@@ -171,7 +171,7 @@ test('a newly created room can run /task', async ({ browser, request: raw }) => 
     await page.getByRole('button', { name: 'New project' }).click();
     await page.getByLabel('Project name').fill('Klonk');
     await page.getByRole('button', { name: 'New project' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Klonk' })).toBeVisible();
+    await expect(page.locator('#room-context')).toHaveText('Klonk');
     await page.getByLabel('Message', { exact: true }).fill('/task new room work :: it finishes');
     await page.getByRole('button', { name: 'Send' }).click();
     const card = page.locator('.chat-task').filter({ has: page.locator('h3', { hasText: 'new room work' }) });

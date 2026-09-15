@@ -141,7 +141,11 @@ th, td { padding: 14px 8px; border-bottom: 1px solid var(--hairline); vertical-a
 [role="alert"] { color: var(--alert); }
 /* min-height would fight the flex column on a short viewport and push the
    composer off-screen, so the transcript only takes what is left. */
-.transcript { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 4px; overflow-anchor: none; }
+.transcript { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 4px; overflow-anchor: none; display: flex; flex-direction: column; }
+/* Bottom-anchored: a room with two messages reads as a conversation that has
+   just started, not as a page that failed to fill. Once the stream is taller
+   than the pane, auto margin collapses and normal scrolling resumes. */
+.transcript-stream { margin-top: auto; }
 .message-card { padding: 12px 8px; margin-bottom: 8px; border-bottom: 1px solid var(--hairline); overflow-wrap: anywhere; }
 .message-meta { display: flex; gap: 12px; align-items: baseline; margin-bottom: 6px; }
 .message-meta time { font-size: 12px; color: var(--secondary); }

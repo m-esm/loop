@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  isActiveStatus, type Message, type MessageSnapshot, type RoomAgent, type RoomFile, type RoomFilesSnapshot,
+  isActiveStatus, isRunningStatus, type Message, type MessageSnapshot, type RoomAgent, type RoomFile, type RoomFilesSnapshot,
   type RoomsSnapshot, type RoomSummary, type Task, type TaskSnapshot,
 } from '@loop/types';
 import { api, ApiError, type Me } from '../lib/api';
-import { applyTaskEvent, needsHumanByRoom, needsHumanCount, type RoomFeed } from '../lib/feed';
+import { applyTaskEvent, needsHumanByRoom, needsHumanCount, needsHumanTasks, type RoomFeed } from '../lib/feed';
 import TasksFeed from './TasksFeed';
 import TasksPanel, { TaskDetail } from './TasksPanel';
 import Transcript from './Transcript';
@@ -81,6 +81,7 @@ export default function Room() {
   const [inspectThreadId, setInspectThreadId] = useState<string | null>(null);
   const [inspectAgent, setInspectAgent] = useState<RoomAgent | null>(null);
   const [inspectFileId, setInspectFileId] = useState<string | null>(null);
+  const [steered, setSteered] = useState<RoomSummary | null>(null);
   const [inspectorHost, setInspectorHost] = useState<HTMLElement | null>(null);
   const [accountHost, setAccountHost] = useState<HTMLElement | null>(null);
   const [error, setError] = useState('');
@@ -171,12 +172,29 @@ export default function Room() {
     });
     return () => controller.abort();
   }, [me, attempt, selected, rooms]);
+  // The rail already names the open room and marks it aria-current, so a
+  // heading repeating it spends the widest line in the app on a word the user
+  // can read two inches to the left. The eyebrow carried the constant
+  // "Project room", which is equally free of information. Swap them: the
+  // eyebrow names the place, the heading says what is happening in it.
+  // rooms is fetched once at load, so rooms[].paused is stale the moment
+  // anyone steers. RoomSteering already polls this room every two seconds;
+  // it reports upward instead of a second poller chasing the same field.
+  const roomSummary = steered ?? rooms?.find((room) => room.id === selected);
+  const waitingHere = needsHumanTasks(state.tasks).length;
+  const runningHere = state.tasks.filter((task) => isRunningStatus(task.status)).length;
+  const headline = !selected
+    ? 'Inbox'
+    : roomSummary?.paused ? 'Paused'
+      : waitingHere > 0 ? (waitingHere === 1 ? '1 task needs you' : `${waitingHere} tasks need you`)
+        : runningHere > 0 ? (runningHere === 1 ? '1 task running' : `${runningHere} tasks running`)
+          : 'Nothing running';
   useEffect(() => {
     const heading = document.getElementById('room-heading');
-    if (heading) heading.textContent = selectedName;
+    if (heading) heading.textContent = headline;
     const context = document.getElementById('room-context');
-    if (context) context.textContent = selected ? 'Project room' : 'Home';
-  }, [selectedName, selected]);
+    if (context) context.textContent = selected ? selectedName : 'Home';
+  }, [selectedName, selected, headline]);
   useEffect(() => { setInspectorHost(document.getElementById('inspector')); }, []);
   useEffect(() => { setAccountHost(document.getElementById('account-chrome')); }, []);
   useEffect(() => {
@@ -235,6 +253,7 @@ export default function Room() {
     writeRoomQuery(created.id, 'push');
   }
   function selectRoom(id: string) {
+    setSteered(null);
     setSelected(id);
     writeRoomQuery(id, 'push');
   }
@@ -315,7 +334,7 @@ export default function Room() {
       selectRoom(task.roomId);
     }} onOpenRoom={(id) => { setView('chat'); selectRoom(id); }} /> : view === 'chat' ? <section aria-label="Chat">
       <Transcript tasks={state.tasks} messages={state.messages} files={files} onOpenThread={openThread} onOpenArtifact={openArtifact} />
-      <Composer author={me.displayName} roomId={selected} />
+      <Composer author={me.displayName} roomId={selected} onRoom={setSteered} />
     </section> : view === 'tasks' ? <TasksPanel
       tasks={state.tasks}
       room={selected}

@@ -4,11 +4,13 @@ import { useEffect, useRef, useState } from 'react';
 import type { RoomSummary } from '@loop/types';
 import { api } from '../lib/api';
 
-export default function RoomSteering({ roomId }: { roomId: string }) {
+export default function RoomSteering({ roomId, onRoom }: { roomId: string; onRoom?: (room: RoomSummary) => void }) {
   const [room, setRoom] = useState<RoomSummary | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [open, setOpen] = useState(false);
+  const onRoomRef = useRef(onRoom);
+  useEffect(() => { onRoomRef.current = onRoom; }, [onRoom]);
   const saving = useRef(false);
   const revision = useRef(0);
   const path = `/rooms/${encodeURIComponent(roomId)}`;
@@ -21,7 +23,7 @@ export default function RoomSteering({ roomId }: { roomId: string }) {
       const version = ++revision.current;
       try {
         const value = await api<RoomSummary>(path, { signal: controller.signal });
-        if (!controller.signal.aborted && version === revision.current) setRoom(value);
+        if (!controller.signal.aborted && version === revision.current) { setRoom(value); onRoomRef.current?.(value); }
       } catch (error) {
         if (!controller.signal.aborted && version === revision.current) {
           setError(error instanceof Error ? error.message : 'Room controls could not be loaded.');
@@ -45,9 +47,11 @@ export default function RoomSteering({ roomId }: { roomId: string }) {
     setBusy(true);
     setError('');
     try {
-      setRoom(await api<RoomSummary>(`${path}/steer`, {
+      const next = await api<RoomSummary>(`${path}/steer`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(change),
-      }));
+      });
+      setRoom(next);
+      onRoomRef.current?.(next);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Room controls could not be saved.');
     } finally { saving.current = false; setBusy(false); }
