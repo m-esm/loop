@@ -320,33 +320,37 @@ nav .logout { margin-left: 12px; }
 .inbox-empty-body { font-size: 13px; line-height: 1.6; margin-bottom: 16px; }
 .inbox-empty-action { font-size: 13px; background: var(--accent); border-color: transparent; color: var(--text); }
 .inbox-empty-action:hover:not(:disabled) { background: var(--accent-hover); border-color: transparent; }
-/* One row of either Home list, transcribed from the terms the row above is
-   declared in: 1px of border top and bottom, 10px of padding top and bottom,
-   the title line (.inbox-title, 14px at line-height 1.35), the 2px grid row
-   gap, the sub line (.inbox-sub, 12px at the root line-height 1.5), and the 4px
-   that separates one row from the next. Chromium lays that out at 64.89px,
-   which is the pitch a rendered list actually repeats at, so the floor below is
-   one whole row rather than a rounded guess.
-
-   Transcribed is the load bearing word. This calc restates those rules, it does
-   not read them, so the row's styling lives in two places and they can drift
-   apart silently: set .inbox-title to 22px and the rendered pitch becomes
-   75.69px while this stays 64.89px, and the list clips below one row at 700,
-   560 and 500 with every spec still green, because the seeded depths leave
-   enough room at those heights to hide it. So change a row rule and change this
-   calc in the same commit. Deriving the floor from one measured source is a
-   slice of its own; tests/inbox-activity.spec.ts already reads the pitch off a
-   rendered row rather than trusting this number. */
+/* The heading over either list: .inbox h2 at 14px on the root line-height,
+   plus the 16px it is given below itself. h2 margin-top is already 0. */
 :root {
-  --inbox-row: calc(2px + 20px + (14px * 1.35) + 2px + (12px * 1.5) + 4px);
-  /* The heading over either list: .inbox h2 at 14px on the root line-height,
-     plus the 16px it is given below itself. h2 margin-top is already 0. */
   --inbox-heading: calc((14px * 1.5) + 16px);
   /* The control under the activity list: its 4px margin-top, the 1px button
      border top and bottom, its 4px padding top and bottom, and a 12px label on
      the root line-height. Chromium lays the button out at 28px. */
   --room-activity-control: calc(4px + 2px + 8px + (12px * 1.5));
 }
+/* One row of either Home list, which is the pitch both floors below are built
+   from. It is read off a row that is actually rendered, not transcribed from
+   the rules that style one: apps/web/lib/rowPitch.ts measures a live .inbox-row
+   (its border box plus the margin that separates it from the next row) and
+   publishes the result as --inbox-row-measured on this very element, so the
+   floor and the row cannot disagree.
+
+   The calc is the fallback, not the source of truth. It restates .inbox-row,
+   .inbox-title and .inbox-sub term by term (1px of border top and bottom, 10px
+   of padding top and bottom, the 14px title line at line-height 1.35, the 2px
+   grid row gap, the 12px sub line at the root line-height 1.5, and the 4px
+   between rows) and Chromium lays that out at 64.89px. It exists only to carry
+   the first paint, before any row has been measured, so the floor is never zero
+   and nothing starves or jumps on the way in. Once the measurement lands it is
+   never consulted again, and being stale does not break the floor: restyling
+   the row to a 22px title moves the measured pitch to 75.69px and the floor
+   with it, while this number stays at 64.89px and no longer matters.
+
+   Substitution happens here rather than at :root on purpose. The measurement is
+   published on main, so a var() written at :root would look for it on :root,
+   miss it, and inherit the fallback down forever. */
+main { --inbox-row: var(--inbox-row-measured, calc(2px + 20px + (14px * 1.35) + 2px + (12px * 1.5) + 4px)); }
 /* Neither section may be reduced to a box too short to show anything. A flex
    item with min-height:0 shrinks to nothing, and that is not a bound, it is a
    different way to lose the content: at eight parked on 900x800 the shut

@@ -1,5 +1,7 @@
+import { useRef } from 'react';
 import { isFailureStatus, relativeAgo, type RoomSummary, type Task } from '@loop/types';
 import { needsHumanTasks } from '../lib/feed';
+import { useMeasuredRowPitch } from '../lib/rowPitch';
 import RoomActivity from './RoomActivity';
 
 export default function Inbox({ tasks, rooms, onSelect, onOpenRoom }: {
@@ -10,12 +12,23 @@ export default function Inbox({ tasks, rooms, onSelect, onOpenRoom }: {
 }) {
   const waiting = needsHumanTasks(tasks)
     .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt) || a.id.localeCompare(b.id));
+  // The floor under both Home lists is measured off a rendered row rather than
+  // transcribed from the rules that style one. Both lists render .inbox-row at
+  // the same density, so one measurement serves both floors and it is taken
+  // here, in the one component that renders both sections, instead of once in
+  // each of them. The anchor is the queue section; the hook walks up to the
+  // main both sections hang off and publishes the pitch there.
+  const homeAnchor = useRef<HTMLElement | null>(null);
+  // Re-measure when the rendered rows change identity, which is what an SSE
+  // update to the queue or the room list does. A row that stays put and merely
+  // changes size is the observer's job, not this signal's.
+  useMeasuredRowPitch(homeAnchor, `${waiting.length}:${tasks.length}:${rooms.length}`);
   // Two different empty states. An account that has never produced a task needs
   // telling what the Inbox is for; an emptied queue is a human who cleared their
   // work and wants to know that, not an onboarding pitch.
   const firstRun = tasks.length === 0;
   return <>
-    <section aria-label="Inbox" className="inbox">
+    <section aria-label="Inbox" className="inbox" ref={homeAnchor}>
     <h2>Needs you</h2>
     {waiting.length === 0 ? <div className="inbox-empty">
       <p className="inbox-empty-title">{firstRun ? 'Nothing needs you yet' : 'Nothing needs you'}</p>
