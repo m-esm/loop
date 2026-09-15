@@ -396,10 +396,21 @@ main:has(> .room-activity[data-expanded="true"]) > section[aria-label="Inbox"] {
 .room-activity-summary { color: var(--secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .room-activity-toggle { margin-top: 4px; padding: 4px 10px; font-size: 12px; background: transparent; color: var(--secondary); }
 .room-activity-toggle[aria-expanded="true"] { background: var(--raised); }
-.auth-panel { width: 100%; max-width: 420px; padding-top: 12px; }
-.auth-panel > .muted { font-size: 13px; line-height: 1.6; }
-.auth-panel h2 { margin-bottom: 8px; }
-.auth-panel form { grid-template-columns: 1fr; }
+/* Signed out is its own page, not the app with empty furniture: the rail,
+   header and inspector are hidden and the panel is centred on the ground. */
+body[data-signed-out] .projects,
+body[data-signed-out] main > header,
+body[data-signed-out] #inspector { display: none; }
+body[data-signed-out] .shell { grid-template-columns: minmax(0, 1fr); }
+body[data-signed-out] main { display: grid; place-items: center; padding: 24px; }
+.auth-panel { width: 100%; max-width: 380px; padding-top: 0; }
+.auth-brand { font-size: 20px; font-weight: 600; letter-spacing: -.02em; margin-bottom: 28px; }
+.auth-panel h2 { font-size: 22px; margin-bottom: 6px; }
+.auth-panel > .muted { font-size: 13px; line-height: 1.6; margin-bottom: 20px; }
+.auth-panel form { grid-template-columns: 1fr; gap: 14px; padding: 20px; background: var(--panel); border: 1px solid var(--hairline); border-radius: var(--radius-panel); }
+.auth-panel form button[type="submit"] { justify-self: stretch; text-align: center; }
+.auth-switch { margin: 16px 0 0; font-size: 13px; color: var(--secondary); }
+.auth-link { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
 .room-agents { margin-bottom: 24px; }
 .room-agents ul { list-style: none; padding: 0; margin: 0 0 14px; }
 .room-agents li { display: flex; gap: 8px; align-items: center; font-size: 14px; padding: 8px 0; border-bottom: 1px solid var(--hairline); }
@@ -410,7 +421,15 @@ main:has(> .room-activity[data-expanded="true"]) > section[aria-label="Inbox"] {
 .room-team ul { list-style: none; padding: 0; margin: 0 0 14px; }
 .room-team li { display: flex; gap: 8px; align-items: center; font-size: 14px; padding: 8px 0; border-bottom: 1px solid var(--hairline); }
 .room-team li .muted { margin-left: auto; }
-.room-team form { grid-template-columns: 1fr; padding: 12px; margin-bottom: 12px; }
+.room-team form { grid-template-columns: 1fr; gap: 12px; padding: 14px; margin-bottom: 12px; }
+/* The OS select is the one control on this panel that ignores the theme, so
+   give it the same surface, border and caret as every other field. */
+.room-team select { appearance: none; padding-right: 30px; background-image:
+  linear-gradient(45deg, transparent 50%, var(--secondary) 50%),
+  linear-gradient(135deg, var(--secondary) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 52%, calc(100% - 10px) 52%;
+  background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
+.room-team select:focus { border-color: var(--accent); }
 .room-team .invite-once { font-size: 13px; margin-bottom: 12px; }
 .room-team .invite-link { font-size: 12px; word-break: break-all; }
 /* A drop target, not a raw file input. The native control stays in the DOM for

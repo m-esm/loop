@@ -1,6 +1,6 @@
 import { test, expect, type BrowserContext } from '@playwright/test';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { once } from 'node:events';
@@ -41,10 +41,21 @@ test('login form then the room after login', async ({ browser, request }) => {
     contexts.push(context);
     const page = await context.newPage();
     await page.goto('http://127.0.0.1:3100/?room=default');
+    // One form at a time: sign-in is the default, register is a click away,
+    // and the signed-out page shows none of the app shell.
     await expect(page.getByRole('form', { name: 'Sign in' })).toBeVisible();
+    await expect(page.getByRole('form', { name: 'Create account' })).toHaveCount(0);
+    await expect(page.locator('.projects')).toBeHidden();
+    await expect(page.locator('#inspector')).toBeHidden();
+    await page.getByRole('button', { name: 'Create one' }).click();
     await expect(page.getByRole('form', { name: 'Create account' })).toBeVisible();
-    const loginShot = resolve('/tmp/loop-auth-login.png');
-    await page.screenshot({ path: loginShot });
+    await expect(page.getByRole('form', { name: 'Sign in' })).toHaveCount(0);
+    // The switch link shares its accessible name with the submit button.
+    await page.locator('.auth-switch').getByRole('button', { name: 'Sign in' }).click();
+    await expect(page.getByRole('form', { name: 'Sign in' })).toBeVisible();
+    // One frame at 1440x900, not a two-frame collage: a capture taller than the
+    // viewport documents a page nobody sees at that size.
+    await page.screenshot({ path: resolve('docs/screenshots/auth.png') });
 
     const signIn = page.getByRole('form', { name: 'Sign in' });
     await signIn.getByLabel('Email').fill(OPERATOR.email);
@@ -53,21 +64,7 @@ test('login form then the room after login', async ({ browser, request }) => {
     await expect(page.locator('[data-live]')).toHaveAttribute('data-live', '1');
     await expect(page.locator('.account-chrome')).toContainText(OPERATOR.displayName);
     await expect(page.getByRole('navigation', { name: 'Room views' }).getByRole('button', { name: 'Log out' })).toHaveCount(0);
-    const roomShot = resolve('/tmp/loop-auth-room.png');
-    await page.screenshot({ path: roomShot });
 
-    const loginB64 = readFileSync(loginShot).toString('base64');
-    const roomB64 = readFileSync(roomShot).toString('base64');
-    const collage = await browser.newPage();
-    await collage.setViewportSize({ width: 1440, height: 900 });
-    await collage.setContent(
-      `<html><body style="margin:0;background:#fff">
-        <img src="data:image/png;base64,${loginB64}" style="display:block;width:1440px" />
-        <img src="data:image/png;base64,${roomB64}" style="display:block;width:1440px" />
-      </body></html>`,
-    );
-    await collage.screenshot({ path: resolve('docs/screenshots/auth.png'), fullPage: true });
-    await collage.close();
     await page.getByRole('button', { name: 'Log out' }).click();
     await expect(page.getByRole('form', { name: 'Sign in' })).toBeVisible();
   } finally {
