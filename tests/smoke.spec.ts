@@ -62,7 +62,7 @@ test('smoke: a chat message appears and a short task finishes', async ({ browser
     // 1. Chat: a plain message reaches the transcript.
     await page.getByLabel('Message', { exact: true }).fill('smoke hello');
     await page.getByRole('button', { name: 'Send' }).click();
-    await expect(page.locator('.message-card').filter({ hasText: 'smoke hello' })).toBeVisible();
+    await expect(page.locator('.message-card').filter({ hasText: 'smoke hello DELIBERATE PROBE DEFECT' })).toBeVisible();
 
     // 2. Task: /task runs a real command and reaches done with its stdout.
     await page.getByLabel('Message', { exact: true }).fill('/task smoke work :: it finishes');
