@@ -317,6 +317,14 @@ nav .logout { margin-left: 12px; }
 .inbox-empty-body { font-size: 13px; line-height: 1.6; margin-bottom: 16px; }
 .inbox-empty-action { font-size: 13px; background: var(--accent); border-color: transparent; color: var(--text); }
 .inbox-empty-action:hover:not(:disabled) { background: var(--accent-hover); border-color: transparent; }
+/* Room activity reuses the queue row's two-line grid, so both lists on Home
+   scan at one density instead of reading as two different apps. The room name
+   takes the title slot, the newest touch takes the time slot, and the counts
+   take the sub line. */
+.room-activity { padding-top: 32px; }
+.room-activity-row:hover { border-color: var(--border); }
+.room-activity-name { color: var(--text); }
+.room-activity-summary { color: var(--secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .auth-panel { width: 100%; max-width: 420px; padding-top: 12px; }
 .auth-panel > .muted { font-size: 13px; line-height: 1.6; }
 .auth-panel h2 { margin-bottom: 8px; }

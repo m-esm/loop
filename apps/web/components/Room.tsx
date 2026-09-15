@@ -313,7 +313,7 @@ export default function Room() {
       pendingTask.current = task.id;
       setView('chat');
       selectRoom(task.roomId);
-    }} /> : view === 'chat' ? <section aria-label="Chat">
+    }} onOpenRoom={(id) => { setView('chat'); selectRoom(id); }} /> : view === 'chat' ? <section aria-label="Chat">
       <Transcript tasks={state.tasks} messages={state.messages} files={files} onOpenThread={openThread} onOpenArtifact={openArtifact} />
       <Composer author={me.displayName} roomId={selected} />
     </section> : view === 'tasks' ? <TasksPanel
