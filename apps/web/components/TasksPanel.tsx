@@ -34,7 +34,14 @@ export default function TasksPanel({
       </div>
     </div>
     <CreateTaskForm roomId={room} />
-    {view === 'board' ? <div className="task-board" role="region" aria-label="Task board" tabIndex={0}>
+    {!tasks.length ? <div className="tasks-empty">
+      <p className="inbox-empty-title">No tasks yet</p>
+      <p className="inbox-empty-body">Create one to put work on the board. Columns appear once something is running.</p>
+      <button type="button" className="inbox-empty-action" onClick={() => {
+        const toggle = document.querySelector('.task-create button[aria-expanded="false"]');
+        if (toggle instanceof HTMLButtonElement) toggle.click();
+      }}>Create a task</button>
+    </div> : view === 'board' ? <div className="task-board" role="region" aria-label="Task board" tabIndex={0}>
       {TASK_STATUSES.map((status) => {
         const columnTasks = tasks.filter((task) => task.status === status);
         return <section className="task-board-column" key={status} data-task-status={status} aria-label={statusLabel(status)}>
@@ -45,7 +52,6 @@ export default function TasksPanel({
             <span className="task-board-owner">Owner: {actorLabel(task.owner, task.ownerPrincipalId)}</span>
             <span className={chipClass(task.status)}>{statusLabel(task.status)}</span>
           </button>)}
-          {!columnTasks.length && <p className="task-board-empty">No tasks</p>}
         </section>;
       })}
     </div> : <div className="table-wrap"><table>
@@ -55,6 +61,5 @@ export default function TasksPanel({
         <td>{actorLabel(task.owner, task.ownerPrincipalId)}</td><td><span className={chipClass(task.status)}>{statusLabel(task.status)}</span></td>
       </tr>)}</tbody>
     </table></div>}
-    {!tasks.length && <p className="muted">No tasks yet. Create the first task above.</p>}
   </section>;
 }

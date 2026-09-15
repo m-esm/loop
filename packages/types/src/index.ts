@@ -5,6 +5,10 @@ export * from './composer';
 export * from './proposal';
 export * from './spawn';
 
+export function roomRoleLabel(role: 'owner' | 'member'): string {
+  return role === 'owner' ? 'Owner' : 'Member';
+}
+
 export interface RoomSummary {
   id: string;
   name: string;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
-import type { CreatedRoomInvite, RoomInvite, RoomMembersSnapshot } from '@loop/types';
+import { roomRoleLabel, type CreatedRoomInvite, type RoomInvite, type RoomMembersSnapshot } from '@loop/types';
 import { api } from '../lib/api';
 
 export default function Team({ room }: { room: string }) {
@@ -60,8 +60,12 @@ export default function Team({ room }: { room: string }) {
     } finally { setBusy(false); }
   }
   if (!snapshot) {
-    if (!error) return null;
-    return <p role="alert">{error}</p>;
+    return (
+      <section aria-label="Team" className="room-team">
+        <h2>Team</h2>
+        {error ? <p role="alert">{error}</p> : <p className="muted" role="status">Loading team</p>}
+      </section>
+    );
   }
   const owner = snapshot.role === 'owner';
   return (
@@ -71,13 +75,13 @@ export default function Team({ room }: { room: string }) {
         ? <p className="muted">No members in this room.</p>
         : <ul>{snapshot.members.map((member) => <li key={member.principalId}>
           <span>{member.displayName}</span>
-          <span className="muted">{member.role}</span>
+          <span className="muted">{roomRoleLabel(member.role)}</span>
         </li>)}</ul>}
       {owner && invites.length > 0 && <>
         <h3>Pending invites</h3>
         <ul>{invites.map((row) => <li key={row.id}>
           <span>{row.email}</span>
-          <span className="muted">{row.role}</span>
+          <span className="muted">{roomRoleLabel(row.role)}</span>
         </li>)}</ul>
       </>}
       {owner && <form aria-label="Invite to room" onSubmit={(event) => { void invite(event); }}>
@@ -86,8 +90,8 @@ export default function Team({ room }: { room: string }) {
         </label>
         <label>Role
           <select name="role" required disabled={busy} defaultValue="member">
-            <option value="member">member</option>
-            <option value="owner">owner</option>
+            <option value="member">{roomRoleLabel('member')}</option>
+            <option value="owner">{roomRoleLabel('owner')}</option>
           </select>
         </label>
         <button type="submit" disabled={busy}>{busy ? 'Inviting...' : 'Invite'}</button>
