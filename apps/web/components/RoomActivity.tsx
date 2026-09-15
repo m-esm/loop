@@ -1,4 +1,4 @@
-import { isActiveStatus, relativeAgo, type RoomSummary, type Task } from '@loop/types';
+import { isRunningStatus, relativeAgo, type RoomSummary, type Task } from '@loop/types';
 import { needsHumanCount } from '../lib/feed';
 
 /**
@@ -26,7 +26,7 @@ export default function RoomActivity({ tasks, rooms, onOpenRoom }: {
     return {
       room,
       total: owned.length,
-      active: owned.filter((task) => isActiveStatus(task.status)).length,
+      active: owned.filter((task) => isRunningStatus(task.status)).length,
       waiting: needsHumanCount(owned),
       newest: owned.reduce((latest, task) => task.updatedAt > latest ? task.updatedAt : latest, ''),
     };
