@@ -11,15 +11,19 @@ import { needsHumanCount } from '../lib/feed';
  */
 
 /**
- * Rows the list keeps while it is shut. Measured on Home at 1440x900 with a
- * four deep "Needs you" queue, the tallest queue that still leaves the
- * activity list a usable share of the page: the list starts at y=476 and each
- * row occupies 64.89px, so row six ends at y=862 and row seven would end at
- * y=926, past the 900 viewport. Six rows plus the toggle are the most that
- * stay on screen, so an uncapped ninth row ending at y=1056 is the bug this
- * number fixes.
+ * A row count cannot answer "does this list fit". The "Needs you" queue sits
+ * above this section and pushes it down, and that queue is as deep as the
+ * human's day happens to be, so any constant tuned against one queue depth is
+ * coupled to a variable it never reads: six rows ended at y=862 under a four
+ * deep queue and at y=1121 under an eight deep one, in the same 900 viewport.
+ *
+ * So the list bounds its own box instead of counting rows. While it is shut
+ * the section takes the space the queue leaves (`flex: 1 1 auto`) and the list
+ * scrolls inside it, which puts the list bottom and the toggle inside the
+ * viewport at every queue depth and every viewport height, with no constant to
+ * tune. Opening it gives the list its natural height and lets Home scroll,
+ * which is the opt in the reviewer approved.
  */
-const COLLAPSED_ROWS = 6;
 
 function summarise(total: number, active: number, waiting: number): string {
   if (total === 0) return 'No activity yet';
@@ -48,14 +52,13 @@ export default function RoomActivity({ tasks, rooms, onOpenRoom }: {
       newest: owned.reduce((latest, task) => task.updatedAt > latest ? task.updatedAt : latest, ''),
     };
   }).sort((a, b) => b.newest.localeCompare(a.newest) || a.room.name.localeCompare(b.room.name));
-  // The cap trims the tail of that sorted list, so a shut list can only ever
-  // hold back rooms older than every row it shows.
-  const hidden = Math.max(0, rows.length - COLLAPSED_ROWS);
-  const shown = open || hidden === 0 ? rows : rows.slice(0, COLLAPSED_ROWS);
-  return <section aria-label="Room activity" className="inbox room-activity">
+  // Every room renders in both states. Shut, the list is a scrolling box; open,
+  // it runs to its natural height. Nothing is held back either way, so the
+  // label counts rooms rather than a hidden remainder it would have to measure.
+  return <section aria-label="Room activity" className="inbox room-activity" data-expanded={open}>
     <h2>Room activity</h2>
     <ol id={listId} className="inbox-list">
-      {shown.map((row) => <li key={row.room.id}>
+      {rows.map((row) => <li key={row.room.id}>
         {/* The rail owns data-room. This list is a second surface for the same
             rooms, so it carries its own attribute and a rail query stays exact. */}
         <button type="button" className="inbox-row room-activity-row" data-activity-room={row.room.id}
@@ -70,12 +73,13 @@ export default function RoomActivity({ tasks, rooms, onOpenRoom }: {
         </button>
       </li>)}
     </ol>
-    {/* A shut list names what it is holding back, so the cap never reads as
-        the whole story. Same disclosure idiom as the Steering toggle. */}
-    {hidden > 0 && <button type="button" className="room-activity-toggle"
+    {/* The escape hatch out of the shut list's scrolling box. Its label reads
+        straight off the room count, so it stays honest without measuring
+        anything. Same disclosure idiom as the Steering toggle. */}
+    {rows.length > 1 && <button type="button" className="room-activity-toggle"
       aria-expanded={open} aria-controls={listId}
       onClick={() => { setOpen((value) => !value); }}>
-      {open ? 'Show fewer rooms' : `Show ${hidden} more ${hidden === 1 ? 'room' : 'rooms'}`}
+      {open ? 'Show fewer rooms' : `Show all ${rows.length} rooms`}
     </button>}
   </section>;
 }

@@ -1,4 +1,4 @@
-import { test, expect, type BrowserContext } from '@playwright/test';
+import { test, expect, type APIRequestContext, type Browser, type BrowserContext } from '@playwright/test';
 import type { Task } from '@loop/types';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -124,146 +124,194 @@ test('Home lists recent activity per room, newest first, and opens the room', as
 });
 
 /**
- * The cap guard. Nine rooms used to render nine rows and the last one ended at
- * y=1056 in a 900 high viewport, below the fold on the page Home is supposed to
- * fit. The instrument here is content extent, the last rendered row's
- * `y + height` read from `boundingBox()`, never `main.scrollHeight`: the shell
- * sets `main { height: 100vh }`, so scrollHeight tracks the scroll box rather
- * than where the list actually ends and moves even when nothing overflows.
+ * The overflow guard. Nine rooms used to render a shut list whose last row ended
+ * at y=1056 in a 900 high viewport, and the row count that replaced it was tuned
+ * against one "Needs you" queue depth: the same six rows ended at y=862 under a
+ * four deep queue and at y=1121 under an eight deep one. So this runs the same
+ * assertions at two queue depths and two viewport heights, and a constant cannot
+ * satisfy all four.
+ *
+ * The instrument is content extent, `y + height` read from `boundingBox()`,
+ * never `main.scrollHeight`: the shell sets `main { height: 100vh }`, so
+ * scrollHeight tracks the scroll box rather than where content ends and moves
+ * even when nothing overflows. While the list is shut it is a scrolling box, so
+ * the element that has to be on screen is the list's own box rather than its
+ * last row, which sits inside that box and below its clip. The toggle is checked
+ * with it: a reachable list behind an unreachable control is still broken.
  */
-test('Home caps the room activity list inside the viewport and reveals the rest on demand', async ({ browser, request: raw }) => {
-  const dir = mkdtempSync(join(tmpdir(), 'loop-activity-overflow-'));
-  const session = seedSession(join(dir, 'loop.sqlite'));
-  const request = withAuth(raw, session.token);
-  const apiUrl = 'http://127.0.0.1:3101/api';
-  const VIEWPORT_HEIGHT = 900;
-  let context: BrowserContext | undefined;
-  let output = '';
-  const api = spawn(process.execPath, ['dist/src/main.js'], {
-    cwd: resolve('apps/api'),
-    env: { ...process.env, PORT: '3101', WEB_ORIGIN: 'http://127.0.0.1:3100',
-      DATABASE_PATH: join(dir, 'loop.sqlite'), LOOP_RUNNER: '0' },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  api.stdout?.on('data', (chunk) => { output += chunk; });
-  api.stderr?.on('data', (chunk) => { output += chunk; });
-  async function addTask(title: string, roomId: string): Promise<Task> {
-    const response = await request.post(`${apiUrl}/tasks`, {
-      data: { title, definitionOfDone: 'The human decision is recorded.', roomId },
+// One body, two queue depths. The titles below stay quoted literals because the
+// evidence generator reads them with a regex that only matches a quoted string,
+// so a template literal in a loop would drop this guard out of EVIDENCE.md.
+async function keepsActivityListInsideViewport(
+  seed: { parked: number; parkPerRoom: number },
+  browser: Browser,
+  raw: APIRequestContext,
+) {
+  {
+    const dir = mkdtempSync(join(tmpdir(), 'loop-activity-overflow-'));
+    const session = seedSession(join(dir, 'loop.sqlite'));
+    const request = withAuth(raw, session.token);
+    const apiUrl = 'http://127.0.0.1:3101/api';
+    let context: BrowserContext | undefined;
+    let output = '';
+    const api = spawn(process.execPath, ['dist/src/main.js'], {
+      cwd: resolve('apps/api'),
+      env: { ...process.env, PORT: '3101', WEB_ORIGIN: 'http://127.0.0.1:3100',
+        DATABASE_PATH: join(dir, 'loop.sqlite'), LOOP_RUNNER: '0' },
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
-    expect(response.status()).toBe(201);
-    return await response.json() as Task;
-  }
-  async function addRoom(name: string): Promise<{ id: string; name: string }> {
-    const response = await request.post(`${apiUrl}/rooms`, { data: { name } });
-    expect(response.status()).toBe(201);
-    return await response.json() as { id: string; name: string };
-  }
-  async function park(task: Task) {
-    expect((await request.patch(`${apiUrl}/tasks/${task.id}/status`, { data: { status: 'needs_input' } })).ok()).toBeTruthy();
-  }
-  // Timestamps are millisecond ISO strings, so a short pause is enough to make
-  // the touch order, and therefore the sort, deterministic.
-  const tick = () => new Promise((done) => setTimeout(done, 25));
-  try {
-    await expect.poll(async () => {
-      if (api.exitCode !== null) throw new Error(output);
-      return request.get(`${apiUrl}/rooms/default`).then((response) => response.status()).catch(() => 0);
-    }).toBe(200);
-
-    // Nine rooms: the seeded default plus eight, touched oldest first so the
-    // rendered order is known. "Quiet" is never touched and sorts last.
-    const made: Record<string, string> = { Loop: 'default' };
-    for (const name of ['Launch', 'Billing', 'Research', 'Design', 'Infra', 'Support', 'Docs', 'Quiet']) {
-      made[name] = (await addRoom(name)).id;
+    api.stdout?.on('data', (chunk) => { output += chunk; });
+    api.stderr?.on('data', (chunk) => { output += chunk; });
+    async function addTask(title: string, roomId: string): Promise<Task> {
+      const response = await request.post(`${apiUrl}/tasks`, {
+        data: { title, definitionOfDone: 'The human decision is recorded.', roomId },
+      });
+      expect(response.status()).toBe(201);
+      return await response.json() as Task;
     }
-    await addTask('Confirm the room copy', 'default');
-    await tick();
-    for (const name of ['Docs', 'Support', 'Infra']) {
-      await addTask(`Work in ${name}`, made[name]);
+    async function addRoom(name: string): Promise<{ id: string; name: string }> {
+      const response = await request.post(`${apiUrl}/rooms`, { data: { name } });
+      expect(response.status()).toBe(201);
+      return await response.json() as { id: string; name: string };
+    }
+    async function park(task: Task) {
+      expect((await request.patch(`${apiUrl}/tasks/${task.id}/status`, { data: { status: 'needs_input' } })).ok()).toBeTruthy();
+    }
+    // Timestamps are millisecond ISO strings, so a short pause is enough to make
+    // the touch order, and therefore the sort, deterministic.
+    const tick = () => new Promise((done) => setTimeout(done, 25));
+    try {
+      await expect.poll(async () => {
+        if (api.exitCode !== null) throw new Error(output);
+        return request.get(`${apiUrl}/rooms/default`).then((response) => response.status()).catch(() => 0);
+      }).toBe(200);
+
+      // Nine rooms at both depths: the seeded default plus eight, touched oldest
+      // first so the rendered order is known. "Quiet" is never touched and sorts
+      // last. Only the number of parked tasks per room changes between the two
+      // runs, so the queue above grows while the room order stays identical and
+      // the same order assertions hold at both depths.
+      const made: Record<string, string> = { Loop: 'default' };
+      for (const name of ['Launch', 'Billing', 'Research', 'Design', 'Infra', 'Support', 'Docs', 'Quiet']) {
+        made[name] = (await addRoom(name)).id;
+      }
+      await addTask('Confirm the room copy', 'default');
       await tick();
+      for (const name of ['Docs', 'Support', 'Infra']) {
+        await addTask(`Work in ${name}`, made[name]);
+        await tick();
+      }
+      for (const name of ['Design', 'Research', 'Billing']) {
+        for (let n = 0; n < seed.parkPerRoom; n += 1) {
+          await park(await addTask(`Approve the ${name} note ${n + 1}`, made[name]));
+          await tick();
+        }
+      }
+      // Launch is touched last and holds one genuinely running task, which pins
+      // the running count: queued, needs_input and cancelling are active but not
+      // running and must never inflate it.
+      const running = await addTask('Choose the release scope', made.Launch);
+      expect((await request.patch(`${apiUrl}/tasks/${running.id}/status`, { data: { status: 'running' } })).ok()).toBeTruthy();
+      for (let n = 0; n < seed.parkPerRoom; n += 1) {
+        await park(await addTask(`Approve the launch note ${n + 1}`, made.Launch));
+        await tick();
+      }
+
+      context = await authedContext(browser, session.token);
+      const page = await context.newPage();
+      const activity = page.getByRole('region', { name: 'Room activity', exact: true });
+      const rows = activity.locator('[data-activity-room]');
+      const list = page.locator('#room-activity-list');
+      const toggle = activity.getByRole('button', { name: /rooms?$/ });
+      const order = ['Launch', 'Billing', 'Research', 'Design', 'Infra', 'Support', 'Docs', 'Loop', 'Quiet'];
+
+      // The extent instrument: where a rendered element actually ends on screen.
+      async function extent(target: typeof list): Promise<number> {
+        const box = await target.boundingBox();
+        if (!box) throw new Error('the measured element has no box');
+        return box.y + box.height;
+      }
+      // main is the scroll box on Home. Measure from the top of it every time, so
+      // an extent reads where the layout puts content rather than where a click
+      // happened to scroll it.
+      const atTop = async () => {
+        await page.evaluate(() => { const box = document.querySelector('main'); if (box) box.scrollTop = 0; });
+      };
+
+      for (const viewport of [{ width: 1440, height: 900 }, { width: 900, height: 800 }]) {
+        await page.setViewportSize(viewport);
+        await page.goto('http://127.0.0.1:3100/');
+        await expect(activity).toBeVisible();
+        expect(page.viewportSize()?.height).toBe(viewport.height);
+        await expect(page.getByRole('region', { name: 'Inbox', exact: true }).locator('[data-task-id]')).toHaveCount(seed.parked);
+        await atTop();
+
+        // The render barrier, true whether the list bounds its own box or renders
+        // a fixed number of rows, so reverting the fix fails on an extent below
+        // rather than timing out here.
+        await expect(toggle).toBeVisible();
+
+        // The assertions the fix exists to satisfy, ahead of every count and
+        // label: where the shut list ends, and where its only escape hatch ends.
+        expect(await extent(list)).toBeLessThanOrEqual(viewport.height);
+        expect(await extent(toggle)).toBeLessThanOrEqual(viewport.height);
+
+        // Shut, the list is a scrolling box rather than a truncated one, so every
+        // room is present and the tail is reachable by scrolling it.
+        await expect(rows).toHaveCount(9);
+        expect(await list.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+
+        // A shut list names what it holds, and the count reads straight off the
+        // room list rather than off a measurement.
+        await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+        await expect(toggle).toHaveText('Show all 9 rooms');
+        await expect(toggle).toHaveAttribute('aria-controls', 'room-activity-list');
+        await expect(list).toHaveCount(1);
+
+        // Most recently touched first, untouched room last, at both depths.
+        for (const [index, name] of order.entries()) {
+          await expect(rows.nth(index)).toHaveAttribute('data-activity-room', made[name]);
+        }
+        await expect(rows.nth(0)).toContainText('Launch');
+        await expect(rows.nth(0)).toContainText('1 task running');
+        await expect(rows.nth(8)).toContainText('No activity yet');
+
+        // Opening it is the opt in: natural height, and the tail is allowed to
+        // run past the fold because the human asked for it.
+        await toggle.click();
+        await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+        await expect(toggle).toHaveText('Show fewer rooms');
+        await expect(rows).toHaveCount(9);
+        await atTop();
+        expect(await extent(rows.last())).toBeGreaterThan(viewport.height);
+        for (const [index, name] of order.entries()) {
+          await expect(rows.nth(index)).toHaveAttribute('data-activity-room', made[name]);
+        }
+
+        // Shutting it again restores the bounded box at the same viewport.
+        await toggle.click();
+        await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+        await expect(toggle).toHaveText('Show all 9 rooms');
+        await atTop();
+        expect(await extent(list)).toBeLessThanOrEqual(viewport.height);
+        expect(await extent(toggle)).toBeLessThanOrEqual(viewport.height);
+      }
+    } finally {
+      await context?.close();
+      if (api.exitCode === null) {
+        const exited = once(api, 'exit');
+        api.kill('SIGKILL');
+        await exited;
+      }
+      rmSync(dir, { recursive: true, force: true });
     }
-    // Four parked tasks, so the "Needs you" queue above is four rows deep. That
-    // is the queue depth that pushed the ninth room to y=1056.
-    for (const name of ['Design', 'Research', 'Billing']) {
-      await park(await addTask(`Approve the ${name} note`, made[name]));
-      await tick();
-    }
-    const running = await addTask('Choose the release scope', made.Launch);
-    expect((await request.patch(`${apiUrl}/tasks/${running.id}/status`, { data: { status: 'running' } })).ok()).toBeTruthy();
-    await park(await addTask('Approve the launch note', made.Launch));
-
-    context = await authedContext(browser, session.token);
-    const page = await context.newPage();
-    expect(page.viewportSize()?.height).toBe(VIEWPORT_HEIGHT);
-    await page.goto('http://127.0.0.1:3100/');
-    const activity = page.getByRole('region', { name: 'Room activity', exact: true });
-    await expect(activity).toBeVisible();
-    const rows = activity.locator('[data-activity-room]');
-    const toggle = activity.getByRole('button', { name: /rooms?$/ });
-
-    // The extent instrument: where the rendered list actually ends on screen.
-    async function lastRowExtent(): Promise<number> {
-      const box = await rows.last().boundingBox();
-      if (!box) throw new Error('the last activity row has no box');
-      return box.y + box.height;
-    }
-
-    // Shut by default, the rendered list has to end inside the viewport. This is
-    // the assertion the cap exists to satisfy, so it runs before the row count:
-    // an uncapped list fails here, on where the content ends, not on a number.
-    await expect(toggle).toBeVisible();
-    const collapsedExtent = await lastRowExtent();
-    expect(collapsedExtent).toBeLessThanOrEqual(VIEWPORT_HEIGHT);
-    await expect(rows).toHaveCount(6);
-    // The control that reveals the rest has to be on screen too, or the tail is
-    // capped away with no way back to it.
-    const toggleBox = await toggle.boundingBox();
-    expect(toggleBox).not.toBeNull();
-    expect(toggleBox!.y + toggleBox!.height).toBeLessThanOrEqual(VIEWPORT_HEIGHT);
-
-    // A shut list says what it is holding back rather than ending silently.
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await expect(toggle).toHaveText('Show 3 more rooms');
-    await expect(toggle).toHaveAttribute('aria-controls', 'room-activity-list');
-    await expect(page.locator('#room-activity-list')).toHaveCount(1);
-
-    // The cap trims the tail, so the top of the list is still the most recently
-    // touched room and the shut rows are the six newest, in order.
-    await expect(rows.nth(0)).toHaveAttribute('data-activity-room', made.Launch);
-    await expect(rows.nth(0)).toContainText('Launch');
-    await expect(rows.nth(0)).toContainText('1 task running');
-    for (const [index, name] of ['Launch', 'Billing', 'Research', 'Design', 'Infra', 'Support'].entries()) {
-      await expect(rows.nth(index)).toHaveAttribute('data-activity-room', made[name]);
-    }
-    // The rooms the cap holds back are the oldest ones, never a newer one.
-    await expect(activity).not.toContainText('Quiet');
-
-    // Opening it reveals all nine, still newest first, untouched room last.
-    await toggle.click();
-    await expect(rows).toHaveCount(9);
-    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    await expect(toggle).toHaveText('Show fewer rooms');
-    for (const [index, name] of ['Launch', 'Billing', 'Research', 'Design', 'Infra', 'Support', 'Docs', 'Loop', 'Quiet'].entries()) {
-      await expect(rows.nth(index)).toHaveAttribute('data-activity-room', made[name]);
-    }
-    await expect(rows.nth(8)).toContainText('No activity yet');
-    // The revealed tail is what overflows, which is why it is opt in.
-    expect(await lastRowExtent()).toBeGreaterThan(VIEWPORT_HEIGHT);
-
-    // Shutting it again restores the capped list and the count.
-    await toggle.click();
-    await expect(rows).toHaveCount(6);
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await expect(toggle).toHaveText('Show 3 more rooms');
-    expect(await lastRowExtent()).toBeLessThanOrEqual(VIEWPORT_HEIGHT);
-  } finally {
-    await context?.close();
-    if (api.exitCode === null) {
-      const exited = once(api, 'exit');
-      api.kill('SIGKILL');
-      await exited;
-    }
-    rmSync(dir, { recursive: true, force: true });
   }
+}
+
+test('Home keeps the room activity list and its toggle inside the viewport with a four deep queue', async ({ browser, request }) => {
+  await keepsActivityListInsideViewport({ parked: 4, parkPerRoom: 1 }, browser, request);
+});
+
+test('Home keeps the room activity list and its toggle inside the viewport with an eight deep queue', async ({ browser, request }) => {
+  await keepsActivityListInsideViewport({ parked: 8, parkPerRoom: 2 }, browser, request);
 });
