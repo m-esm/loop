@@ -7,6 +7,7 @@ import { once } from 'node:events';
 import Sqlite from 'better-sqlite3';
 import type { RoomFile, Task } from '@loop/types';
 import { authedContext, seedSession, withAuth } from './auth';
+import { captureFlow } from './capture';
 
 const apiUrl = 'http://127.0.0.1:3101/api';
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -213,7 +214,7 @@ test('Files view shows an uploaded file and a member sees the file card', async 
     await expect(form.locator('[data-file-upload]')).toBeAttached();
     await expect(form.getByRole('button', { name: 'Upload', exact: true })).toBeInViewport({ ratio: 1 });
     await expect(row).toBeInViewport({ ratio: 1 });
-    await page.screenshot({ path: resolve('docs/screenshots/files.png') });
+    await captureFlow(page, 'files');
 
     const registered = await raw.post(`${apiUrl}/auth/register`, {
       data: { email: 'reader@loop.local', password: 'password1', displayName: 'Reader' },

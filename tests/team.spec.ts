@@ -6,6 +6,7 @@ import { resolve, join } from 'node:path';
 import { once } from 'node:events';
 import { hashToken } from '../apps/api/src/auth-crypto';
 import { authedContext, seedSession, withAuth } from './auth';
+import { captureFlow } from './capture';
 
 const apiUrl = 'http://127.0.0.1:3101/api';
 
@@ -36,7 +37,7 @@ test('owner invites, invitee registers with the token, lands as a member of that
     await expect(form.getByLabel('Email')).toBeInViewport({ ratio: 1 });
     await expect(form.getByLabel('Role')).toBeInViewport({ ratio: 1 });
     await expect(form.getByRole('button', { name: 'Invite' })).toBeInViewport({ ratio: 1 });
-    await page.screenshot({ path: 'docs/screenshots/team.png', mask: [page.getByLabel('Invite link')], maskColor: '#1e1f25' });
+    await captureFlow(page, 'team', { mask: [page.getByLabel('Invite link')], maskColor: '#1e1f25' });
     const link = await page.getByLabel('Invite link').inputValue();
     const parsed = new URL(link);
     expect(parsed.searchParams.get('room')).toBe('klonk');

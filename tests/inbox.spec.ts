@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { once } from 'node:events';
 import { authedContext, seedSession, withAuth } from './auth';
+import { captureFlow } from './capture';
 
 test('Inbox stays home, orders cross-room parked work, opens Task detail, and updates to empty', async ({ browser, request: raw }) => {
   const dir = mkdtempSync(join(tmpdir(), 'loop-inbox-browser-'));
@@ -57,7 +58,7 @@ test('Inbox stays home, orders cross-room parked work, opens Task detail, and up
     await expect(page.getByRole('complementary', { name: 'Projects', exact: true })).toBeVisible();
     await expect(page.getByRole('complementary', { name: 'Context panel', exact: true })).toHaveCount(0);
     await expect(page.getByLabel('Project name')).toHaveCount(0);
-    await page.screenshot({ path: resolve('docs/screenshots/inbox.png') });
+    await captureFlow(page, 'inbox');
     await rows.first().click();
     await expect(page).toHaveURL(`http://127.0.0.1:3100/?room=${room.id}`);
     await expect(page.getByRole('region', { name: 'Task detail' })).toContainText(tasks[0].definitionOfDone);
