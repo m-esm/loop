@@ -2,11 +2,18 @@ name: CI
 
 # Order matters and is the whole design.
 #
-# lint and the metric run against the committed tree, BEFORE Playwright. The
-# specs rewrite docs/screenshots/, and this runner renders Linux antialiasing
-# against Mac-made blobs, so a capture regenerated here never matches the
-# sha256 the sidecar recorded at capture time. Running the metric after the
-# suite would fail every pull request for a difference that is not a defect.
+# lint and the metric run against the committed tree, BEFORE Playwright,
+# because a regeneration LAUNDERS a stale capture. captureFlow rewrites the
+# sidecar alongside the PNG, so after the suite the sha256 always agrees with
+# whatever this runner just rendered, defect or not.
+#
+# Measured on b10e656 with inbox.png from 76a573a and a current sidecar:
+#   metric first       -> 4  (PNG does not match the capture facts beside it)
+#   metric after suite -> 5  (false green: the regeneration overwrote it)
+#
+# The AA difference between this runner and a Mac never reaches the metric in
+# either order, so this is not about flake. Moving this step below Playwright
+# does not make CI noisy; it makes CI silent while every check stays green.
 #
 # Nothing regenerated on this runner is ever compared to a commit or committed.
 
