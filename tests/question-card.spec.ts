@@ -64,7 +64,7 @@ test('question card answers in the browser and the same task reaches done', asyn
     const rail = page.locator('[data-needs-human]');
     await expect(rail).toHaveAttribute('data-needs-human', '1');
     await expect(rail.locator('.needs-human-pill')).toHaveText('1');
-    await expect(rail.locator('.needs-human-pill')).toHaveAttribute('aria-label', '1 task needs a human');
+    await expect(rail.locator('.needs-human-pill')).toHaveAttribute('aria-label', 'Loop: 1 task needs a human');
     await expect(page).toHaveTitle(/^\(1\) /);
 
     await page.getByLabel('Message', { exact: true }).fill('/task ASK: what shape :: proof');
@@ -76,7 +76,7 @@ test('question card answers in the browser and the same task reaches done', asyn
     await expect(shapeCard.locator('[data-task-question]')).toHaveText('what shape');
     await expect(rail).toHaveAttribute('data-needs-human', '2');
     await expect(rail.locator('.needs-human-pill')).toHaveText('2');
-    await expect(rail.locator('.needs-human-pill')).toHaveAttribute('aria-label', '2 tasks need a human');
+    await expect(rail.locator('.needs-human-pill')).toHaveAttribute('aria-label', 'Loop: 2 tasks need a human');
     await expect(page).toHaveTitle(/^\(2\) /);
 
     await colourCard.getByLabel('Answer').fill('blue');

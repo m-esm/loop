@@ -7,7 +7,7 @@ import {
   type RoomsSnapshot, type RoomSummary, type Task, type TaskSnapshot,
 } from '@loop/types';
 import { api, ApiError, type Me } from '../lib/api';
-import { applyTaskEvent, needsHumanCount, type RoomFeed } from '../lib/feed';
+import { applyTaskEvent, needsHumanByRoom, needsHumanCount, type RoomFeed } from '../lib/feed';
 import TasksFeed from './TasksFeed';
 import TasksPanel, { TaskDetail } from './TasksPanel';
 import Transcript from './Transcript';
@@ -244,6 +244,7 @@ export default function Room() {
     {/* Room owns the feed; portal the rail entry so page.tsx stays a server shell. */}
     <ProjectsRailEntry
       count={needsHumanCount(state.tasks)}
+      counts={needsHumanByRoom(state.tasks)}
       rooms={rooms ?? []}
       selected={selected}
       onSelect={selectRoom}
