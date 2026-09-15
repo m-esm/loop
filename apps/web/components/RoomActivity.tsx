@@ -73,9 +73,30 @@ export default function RoomActivity({ tasks, rooms, onOpenRoom }: {
   // shut state. Open, the section is `flex: 0 0 auto` and the list runs to its
   // natural height, so it never scrolls and `scrollHeight > clientHeight` reads
   // false; gating on the live reading would delete the control while the human
-  // is inside it and strand them in the expanded state with no way back. So the
-  // effect declines to re-measure while open, holding the last shut reading,
-  // and the render keeps the control whenever the list is open.
+  // is inside it and strand them in the expanded state with no way back.
+  //
+  // The `if (open) return` below is the whole of that defence, and it is load
+  // bearing rather than belt and braces: it is what holds `overflows` at its
+  // last shut reading for as long as the list is open. The render used to carry
+  // a second `open ||` disjunct next to it, and measuring showed it could never
+  // fire. The control is only reachable to click while `overflows` is true, and
+  // while open nothing can write `overflows` at all, so `open` true and
+  // `overflows` false is not a state the component has. Thirty odd perturbations
+  // of an open list were driven through the real app with that disjunct deleted
+  // and the control was observed present on every frame throughout: viewport
+  // taller to 2400 and shorter to 300, narrower to 600, the queue above grown
+  // to forty and shrunk back over SSE, the row restyled to 26px and to 6px, the
+  // list capped to 40px by a direct style, the open click raced against a resize
+  // in the same tick, a keyboard open during an SSE flood, and the tallest
+  // viewport at which the shut list clips at all (1083, by 23px) then resized
+  // either side of that edge. The row count is not on that list because it
+  // cannot move: Room.tsx fetches /rooms once per authenticated attempt with no
+  // stream behind it, and the API has no room delete, so rooms neither arrive
+  // nor leave under a live page.
+  //
+  // Keeping the disjunct also hid this guard from the suite: with it in place,
+  // deleting this early return left all six room activity specs green, and
+  // without it the same deletion turns three of them red.
   const shape = rows.map((row) => `${row.room.id}:${row.total}:${row.active}:${row.waiting}`).join('|');
   useEffect(() => {
     const list = listRef.current;
@@ -112,13 +133,14 @@ export default function RoomActivity({ tasks, rooms, onOpenRoom }: {
       </li>)}
     </ol>
     {/* The escape hatch out of the shut list's scrolling box, so it renders
-        only when the shut list actually clips something. `open ||` is the way
-        back: it keeps the control rendered for as long as the list is open,
-        where the overflow condition is false by construction. The label reads
-        straight off the room count, and once the list is known to clip, every
-        room it names is one the human cannot see all of at once. Same
-        disclosure idiom as the Steering toggle. */}
-    {(open || overflows) && <button type="button" className="room-activity-toggle"
+        only when the shut list actually clips something. What keeps it rendered
+        while the human is inside the expanded list is not a second term here,
+        it is the effect above declining to re-measure while open: `overflows`
+        cannot move off the reading that revealed this control until the list is
+        shut again. The label reads straight off the room count, and once the
+        list is known to clip, every room it names is one the human cannot see
+        all of at once. Same disclosure idiom as the Steering toggle. */}
+    {overflows && <button type="button" className="room-activity-toggle"
       aria-expanded={open} aria-controls={listId}
       onClick={() => { setOpen((value) => !value); }}>
       {open ? 'Show fewer rooms' : `Show all ${rows.length} rooms`}

@@ -801,3 +801,201 @@ test('Home floors both lists on the measured row pitch when a direct style overr
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+/**
+ * The effect guard, under live perturbation, and the question that produced
+ * this case.
+ *
+ * The render used to gate this control on `open || overflows`. The `open ||`
+ * half was there so the control could not vanish while the list was expanded
+ * and strand the human with no way to collapse it, and the review record says
+ * deleting it left every spec green. It did, and the reason is that it could
+ * never fire: the control is only there to click while `overflows` is true, and
+ * the effect above declines to re-measure while open, so `open` true with
+ * `overflows` false is not a state this component has. Thirty odd perturbations
+ * of an open list were driven through the real app with the disjunct deleted
+ * and the control was present on every frame of all of them. So the disjunct
+ * went, and what is left holding the escape hatch open is the `if (open) return`
+ * in the effect, alone.
+ *
+ * Deleting that early return turns three of the cases above red on
+ * `toHaveAttribute('aria-expanded', 'true')` with `element(s) not found`. It
+ * only does so with the disjunct gone: while `open ||` was there it masked the
+ * guard, and the same deletion left all six of them green.
+ *
+ * That is what this pins, and it pins it where the existing open and close case
+ * does not look: after the list is already open. The cases above open the list,
+ * assert the control survived, and close it again without touching anything in
+ * between. Everything that can move under an open list moves here instead, and
+ * the instrument is a per frame reading rather than a poll, so a control that
+ * unmounts for one frame and comes back is caught as well as one that leaves
+ * for good. The log is cleared once the list is open, so any entry at all at the
+ * end is the control changing presence while the human was inside it.
+ */
+test('Home keeps the room activity toggle through resize, queue depth and row restyle while the list is open', async ({ browser, request: raw }) => {
+  const dir = mkdtempSync(join(tmpdir(), 'loop-activity-open-'));
+  const session = seedSession(join(dir, 'loop.sqlite'));
+  const request = withAuth(raw, session.token);
+  const apiUrl = 'http://127.0.0.1:3101/api';
+  let context: BrowserContext | undefined;
+  let output = '';
+  const api = spawn(process.execPath, ['dist/src/main.js'], {
+    cwd: resolve('apps/api'),
+    env: { ...process.env, PORT: '3101', WEB_ORIGIN: 'http://127.0.0.1:3100',
+      DATABASE_PATH: join(dir, 'loop.sqlite'), LOOP_RUNNER: '0' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  api.stdout?.on('data', (chunk) => { output += chunk; });
+  api.stderr?.on('data', (chunk) => { output += chunk; });
+  async function addTask(title: string, roomId: string): Promise<Task> {
+    const response = await request.post(`${apiUrl}/tasks`, {
+      data: { title, definitionOfDone: 'The human decision is recorded.', roomId },
+    });
+    expect(response.status()).toBe(201);
+    return await response.json() as Task;
+  }
+  async function addRoom(name: string): Promise<{ id: string; name: string }> {
+    const response = await request.post(`${apiUrl}/rooms`, { data: { name } });
+    expect(response.status()).toBe(201);
+    return await response.json() as { id: string; name: string };
+  }
+  async function park(task: Task) {
+    expect((await request.patch(`${apiUrl}/tasks/${task.id}/status`, { data: { status: 'needs_input' } })).ok()).toBeTruthy();
+  }
+  const tick = () => new Promise((done) => setTimeout(done, 25));
+  try {
+    await expect.poll(async () => {
+      if (api.exitCode !== null) throw new Error(output);
+      return request.get(`${apiUrl}/rooms/default`).then((response) => response.status()).catch(() => 0);
+    }).toBe(200);
+
+    // The same nine room, four parked shape the cases above seed, which is the
+    // shallowest depth at which the shut list clips and the control exists.
+    const made: Record<string, string> = { Loop: 'default' };
+    for (const name of ['Launch', 'Billing', 'Research', 'Design', 'Infra', 'Support', 'Docs', 'Quiet']) {
+      made[name] = (await addRoom(name)).id;
+    }
+    await addTask('Confirm the room copy', 'default');
+    await tick();
+    for (const name of ['Docs', 'Support', 'Infra']) { await addTask(`Work in ${name}`, made[name]); await tick(); }
+    for (const name of ['Design', 'Research', 'Billing']) {
+      await park(await addTask(`Approve the ${name} note 1`, made[name]));
+      await tick();
+    }
+    const running = await addTask('Choose the release scope', made.Launch);
+    expect((await request.patch(`${apiUrl}/tasks/${running.id}/status`, { data: { status: 'running' } })).ok()).toBeTruthy();
+    await park(await addTask('Approve the launch note 1', made.Launch));
+
+    context = await authedContext(browser, session.token);
+    // Per frame presence of the control, recorded as transitions. A poll can
+    // step over a control that leaves and returns inside one frame; this cannot.
+    await context.addInitScript(() => {
+      const log: string[] = [];
+      (window as unknown as { __toggleLog: string[] }).__toggleLog = log;
+      let last: boolean | null = null;
+      const check = () => {
+        const present = !!document.querySelector('.room-activity-toggle');
+        const expanded = document.querySelector('.room-activity')?.getAttribute('data-expanded');
+        if (present !== last) { log.push(`present=${present} expanded=${expanded}`); last = present; }
+        requestAnimationFrame(check);
+      };
+      requestAnimationFrame(check);
+    });
+    const page = await context.newPage();
+    const activity = page.getByRole('region', { name: 'Room activity', exact: true });
+    const rows = activity.locator('[data-activity-room]');
+    const list = page.locator('#room-activity-list');
+    const toggle = activity.getByRole('button', { name: /rooms?$/ });
+    const inbox = page.getByRole('region', { name: 'Inbox', exact: true });
+    const queueRows = inbox.locator('[data-task-id]');
+    const clearLog = () => page.evaluate(() => { (window as unknown as { __toggleLog: string[] }).__toggleLog.length = 0; });
+    const readLog = () => page.evaluate(() => (window as unknown as { __toggleLog: string[] }).__toggleLog.slice());
+    // The control is still the way back after each perturbation, not merely
+    // present in the tree: it carries the open state and the collapse label.
+    async function stillTheWayBack(label: string) {
+      await expect(toggle, label).toHaveCount(1);
+      await expect(toggle, label).toBeVisible();
+      await expect(toggle, label).toHaveAttribute('aria-expanded', 'true');
+      await expect(toggle, label).toHaveText('Show fewer rooms');
+    }
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('http://127.0.0.1:3100/');
+    await expect(activity).toBeVisible();
+    await expect(rows).toHaveCount(9);
+    await expect(queueRows).toHaveCount(4);
+    // Shut and clipping, so the control is earned rather than assumed.
+    await expect(toggle).toBeVisible();
+    expect(await list.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    // Open, the list runs to its natural height, so the reading that revealed
+    // this control is now false and only the effect guard keeps it from being
+    // written. Everything below happens in that state.
+    expect(await list.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(false);
+    await clearLog();
+
+    for (const viewport of [
+      { width: 1440, height: 2400 }, { width: 1440, height: 1400 }, { width: 1440, height: 300 },
+      { width: 600, height: 900 }, { width: 1440, height: 900 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.waitForTimeout(150);
+      await stillTheWayBack(`resized to ${viewport.width}x${viewport.height} while open`);
+    }
+
+    // The queue above grows over SSE, which hands this section a different
+    // amount of room, and shrinks again.
+    const surge: Task[] = [];
+    for (let n = 0; n < 12; n += 1) {
+      const task = await addTask(`Approve the surge note ${n + 1}`, made.Design);
+      await park(task);
+      surge.push(task);
+    }
+    await expect(queueRows).toHaveCount(16);
+    await stillTheWayBack('queue grown to sixteen over SSE while open');
+    for (const task of surge) {
+      expect((await request.patch(`${apiUrl}/tasks/${task.id}/status`, { data: { status: 'running' } })).ok()).toBeTruthy();
+    }
+    await expect(queueRows).toHaveCount(4);
+    await stillTheWayBack('queue shrunk back to four over SSE while open');
+
+    // Rooms created while the page is up are not a perturbation of this list at
+    // all, and that is worth holding still rather than assuming: Room.tsx
+    // fetches /rooms once per authenticated attempt and no stream updates it, so
+    // six new rooms leave the rendered row count where it was. The row count
+    // cannot move under an open list without a reload, which is one of the
+    // reasons `overflows` has nothing that can rewrite it here.
+    for (let n = 0; n < 6; n += 1) { await addRoom(`Surge ${n + 1}`); await tick(); }
+    await page.waitForTimeout(500);
+    await expect(rows).toHaveCount(9);
+    await stillTheWayBack('six rooms created while open');
+
+    // The row is restyled in both directions, so the list box moves under the
+    // observer that is watching it.
+    await page.addStyleTag({ content: '.inbox-title { font-size: 26px }' });
+    await page.waitForTimeout(250);
+    await stillTheWayBack('row restyled larger while open');
+    await page.addStyleTag({ content: '.inbox-title { font-size: 6px } .inbox-sub { font-size: 6px }' });
+    await page.waitForTimeout(250);
+    await stillTheWayBack('row restyled smaller while open');
+
+    // Nothing above changed the control's presence on any frame.
+    expect(await readLog(), 'the control changed presence while the list was open').toEqual([]);
+
+    // And it is still the way back: clicking it returns the bounded box.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(toggle).toHaveCount(1);
+    expect(await list.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+  } finally {
+    await context?.close();
+    if (api.exitCode === null) {
+      const exited = once(api, 'exit');
+      api.kill('SIGKILL');
+      await exited;
+    }
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
