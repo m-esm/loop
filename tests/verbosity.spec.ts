@@ -6,10 +6,16 @@ import { join, resolve } from 'node:path';
 import { once } from 'node:events';
 import { authedContext, seedSession, withAuth } from './auth';
 
+// The collapse is the feature, so assert it before expanding. A bare
+// "expand if not already expanded" passes against a panel that is open at
+// rest, which is exactly the stance this change removed.
 async function expandSteering(page: Page) {
-  const toggle = page.getByRole('group', { name: 'Room steering' }).getByRole('button', { name: 'Steering', exact: true });
+  const group = page.getByRole('group', { name: 'Room steering' });
+  const toggle = group.locator('.room-steering-toggle');
   await expect(toggle).toBeVisible();
-  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(group.getByRole('button')).toHaveCount(1);
+  await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 }
 
@@ -42,7 +48,8 @@ test('owners persist the verbosity dial, members cannot steer, and threads omit 
     await expandSteering(page);
     await expect(controls.getByRole('button', { name: 'Normal', exact: true })).toHaveAttribute('aria-pressed', 'true');
     for (const label of ['Quiet', 'Verbose', 'Normal']) {
-      await expandSteering(page);
+      // The panel is already open here: either from the expand above or from
+      // the post-reload expand at the end of the previous iteration.
       await controls.getByRole('button', { name: label, exact: true }).click();
       await expect(controls.getByRole('button', { name: label, exact: true })).toHaveAttribute('aria-pressed', 'true');
       expect((await (await request.get(`${apiUrl}/rooms/default`)).json()).verbosity).toBe(label.toLowerCase());

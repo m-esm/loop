@@ -9,10 +9,16 @@ import { authedContext, seedSession, withAuth } from './auth';
 
 const apiUrl = 'http://127.0.0.1:3101/api';
 
+// The collapse is the feature, so assert it before expanding. A bare
+// "expand if not already expanded" passes against a panel that is open at
+// rest, which is exactly the stance this change removed.
 async function expandSteering(page: Page) {
-  const toggle = page.getByRole('group', { name: 'Room steering' }).getByRole('button', { name: 'Steering', exact: true });
+  const group = page.getByRole('group', { name: 'Room steering' });
+  const toggle = group.locator('.room-steering-toggle');
   await expect(toggle).toBeVisible();
-  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(group.getByRole('button')).toHaveCount(1);
+  await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 }
 
@@ -52,17 +58,17 @@ test('room steering persists, pauses the runner, wraps up one turn, and stays ou
     await page.getByLabel('Message', { exact: true }).fill('Keep this pass focused on a concrete result.');
     await page.getByLabel('Message', { exact: true }).press('Enter');
     await expect(page.getByRole('log')).toContainText('Keep this pass focused');
-    await expect(controls.getByRole('button', { name: 'Wrap up' })).toBeInViewport({ ratio: 1 });
+    await expect(controls.getByRole('button', { name: 'Wrap up', exact: true })).toBeInViewport({ ratio: 1 });
     await page.screenshot({ path: resolve('docs/screenshots/steering.png') });
 
     await controls.getByRole('button', { name: 'Pause', exact: true }).click();
-    await expect(controls.getByRole('button', { name: 'Resume' })).toBeEnabled();
+    await expect(controls.getByRole('button', { name: 'Resume', exact: true })).toBeEnabled();
     const state = async () => (await (await request.get(`${apiUrl}/rooms/default`)).json()) as RoomSummary;
     expect((await state()).paused).toBe(true);
     await page.reload();
     await expandSteering(page);
-    await expect(controls.getByRole('button', { name: 'Resume' })).toBeEnabled();
-    await controls.getByRole('button', { name: 'Wrap up' }).click();
+    await expect(controls.getByRole('button', { name: 'Resume', exact: true })).toBeEnabled();
+    await controls.getByRole('button', { name: 'Wrap up', exact: true }).click();
     await expect(controls).toContainText('Wrap up queued.');
     expect((await state()).wrapUp).toBe(true);
     const created = await request.post(`${apiUrl}/tasks`, {
@@ -76,10 +82,10 @@ test('room steering persists, pauses the runner, wraps up one turn, and stays ou
     expect(queued.status).toBe('queued');
     expect(queued.runId).toBeNull();
     expect((await state()).wrapUp).toBe(true);
-    await controls.getByRole('button', { name: 'Resume' }).click();
+    await controls.getByRole('button', { name: 'Resume', exact: true }).click();
     await expect.poll(async () => (await (await request.get(`${apiUrl}/tasks/${task.id}`)).json() as Task).result)
       .toContain('Wrap up: converge on a concrete result');
-    await expect(controls.getByRole('button', { name: 'Wrap up' })).toBeEnabled();
+    await expect(controls.getByRole('button', { name: 'Wrap up', exact: true })).toBeEnabled();
     expect((await state()).wrapUp).toBe(false);
     const next = await (await request.post(`${apiUrl}/tasks`, {
       data: { title: 'Next turn', definitionOfDone: 'Ordinary input' },
@@ -109,11 +115,11 @@ test('room steering persists, pauses the runner, wraps up one turn, and stays ou
     const memberControls = memberPage.getByRole('group', { name: 'Room steering' });
     await expandSteering(memberPage);
     await expect(memberControls.getByRole('button', { name: 'Pause', exact: true })).toBeDisabled();
-    await expect(memberControls.getByRole('button', { name: 'Wrap up' })).toBeDisabled();
+    await expect(memberControls.getByRole('button', { name: 'Wrap up', exact: true })).toBeDisabled();
 
     // Another client changes the room; the existing owner composer refreshes.
     expect((await request.patch(`${apiUrl}/rooms/default/steer`, { data: { paused: true } })).status()).toBe(200);
-    await expect(controls.getByRole('button', { name: 'Resume' })).toBeEnabled();
+    await expect(controls.getByRole('button', { name: 'Resume', exact: true })).toBeEnabled();
   } finally {
     await Promise.all(contexts.map((context) => context.close()));
     if (api.exitCode === null) {

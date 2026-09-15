@@ -55,7 +55,7 @@ export default function RoomSteering({ roomId }: { roomId: string }) {
 
   const status = `${room?.paused ? 'Paused. ' : ''}${room?.wrapUp ? 'Wrap up queued.' : ''}`;
   return <div className="room-steering" role="group" aria-label="Room steering">
-    <button type="button" className="room-steering-toggle" aria-label="Steering" aria-expanded={open} aria-controls={panelId}
+    <button type="button" className="room-steering-toggle" aria-label={`Steering${status ? `. ${status.trim()}` : ''}`} aria-expanded={open} aria-controls={panelId}
       title={status || 'Pause, wrap up, and verbosity'}
       onClick={() => { setOpen((value) => !value); }}>
       Steering{room?.paused ? ' · Paused' : ''}{room?.wrapUp ? ' · Wrap up queued' : ''}
