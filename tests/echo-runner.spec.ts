@@ -84,8 +84,8 @@ test('echo runner finishes /task without PATCH and fails FAIL: titles', async ({
     const echoCardB = tabB.locator('.chat-task').filter({ hasText: 'Echo me' });
     await expect(echoCardA).toBeVisible();
     await expect(echoCardB).toBeVisible();
-    await expect(echoCardA.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
-    await expect(echoCardB.locator('.tp-chip')).toHaveText('done');
+    await expect(echoCardA.locator('.tp-chip')).toHaveText('Done', { timeout: 10_000 });
+    await expect(echoCardB.locator('.tp-chip')).toHaveText('Done');
     await expect(echoCardA.locator('[data-task-result]')).toHaveText('Echo: Echo me');
     await expect(echoCardB.locator('[data-task-result]')).toHaveText('Echo: Echo me');
     await echoCardB.locator('summary').click();
@@ -105,9 +105,9 @@ test('echo runner finishes /task without PATCH and fails FAIL: titles', async ({
     if (failMessage.body.kind !== 'task') throw new Error('Expected task card');
     const failId = failMessage.body.taskId;
     const failCard = tabB.locator('.chat-task').filter({ hasText: 'FAIL: boom' });
-    await expect(failCard.locator('.tp-chip')).toHaveText('failed', { timeout: 10_000 });
+    await expect(failCard.locator('.tp-chip')).toHaveText('Failed', { timeout: 10_000 });
     await expect(failCard.locator('[data-task-error]')).toHaveText('boom');
-    await expect(tabA.locator('.chat-task').filter({ hasText: 'FAIL: boom' }).locator('.tp-chip')).toHaveText('failed');
+    await expect(tabA.locator('.chat-task').filter({ hasText: 'FAIL: boom' }).locator('.tp-chip')).toHaveText('Failed');
     await expect(tabB.getByRole('log').locator('.message-card')).toHaveCount(2);
     const failed = await (await request.get(`${apiUrl}/tasks/${failId}`)).json() as Task;
     await expect.poll(() => foldedStatuses(events, failId)).toEqual(['queued', 'running', 'failed']);

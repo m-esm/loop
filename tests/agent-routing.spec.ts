@@ -90,8 +90,8 @@ test('two /task posts route to two different agent commands', async ({ browser, 
 
     const echoCard = page.locator('.chat-task').filter({ hasText: 'Unassigned probe' });
     const reviewCard = page.locator('.chat-task').filter({ hasText: 'Named probe' });
-    await expect(echoCard.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
-    await expect(reviewCard.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
+    await expect(echoCard.locator('.tp-chip')).toHaveText('Done', { timeout: 10_000 });
+    await expect(reviewCard.locator('.tp-chip')).toHaveText('Done', { timeout: 10_000 });
     await expect(echoCard.locator('[data-task-result]')).toHaveText(echoToken);
     await expect(reviewCard.locator('[data-task-result]')).toHaveText(reviewToken);
     await expect(echoCard.locator('[data-task-agent]')).toHaveCount(0);

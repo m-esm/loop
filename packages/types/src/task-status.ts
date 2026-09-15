@@ -1,14 +1,16 @@
-/** Ported from 3DVP task-status.ts. One vocabulary drives store and UI. */
+/** Ported from 3DVP task-status.ts. One vocabulary drives store and UI.
+ *  `label` is the human reading of the same row. The wire value is a protocol
+ *  detail: `needs_input` is not English and must never reach a person. */
 export const TASK_STATUS = {
-  queued: { active: true, running: false, chip: 'queued' },
-  accepted: { active: true, running: true, chip: 'run' },
-  running: { active: true, running: true, chip: 'run' },
-  needs_input: { active: true, running: false, chip: 'need' },
-  done: { active: false, running: false, chip: 'ok' },
-  failed: { active: false, running: false, chip: 'bad' },
+  queued: { active: true, running: false, chip: 'queued', label: 'Queued' },
+  accepted: { active: true, running: true, chip: 'run', label: 'Starting' },
+  running: { active: true, running: true, chip: 'run', label: 'Running' },
+  needs_input: { active: true, running: false, chip: 'need', label: 'Needs you' },
+  done: { active: false, running: false, chip: 'ok', label: 'Done' },
+  failed: { active: false, running: false, chip: 'bad', label: 'Failed' },
   // Active until the runner confirms the process has stopped.
-  cancelling: { active: true, running: false, chip: 'need' },
-  cancelled: { active: false, running: false, chip: 'bad' },
+  cancelling: { active: true, running: false, chip: 'need', label: 'Cancelling' },
+  cancelled: { active: false, running: false, chip: 'bad', label: 'Cancelled' },
 } as const;
 
 export type TaskStatus = keyof typeof TASK_STATUS;
@@ -30,6 +32,11 @@ export function isRunningStatus(status: string): boolean {
  *  UI without any caller restating the status list. */
 export function isFailureStatus(status: string): boolean {
   return isTaskStatus(status) && TASK_STATUS[status].chip === 'bad';
+}
+/** The human reading of a status. Falls back to the raw value so an unknown
+ *  status from a newer API is still visible rather than blank. */
+export function statusLabel(status: string): string {
+  return isTaskStatus(status) ? TASK_STATUS[status].label : status;
 }
 export function chipClass(status: string): string {
   return isTaskStatus(status) ? `tp-chip ${TASK_STATUS[status].chip}` : 'tp-chip';

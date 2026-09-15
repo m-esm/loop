@@ -48,7 +48,9 @@ test('a message opens a thread in the inspector and replies stay off the main st
 
     await expect(teamHeading).toHaveCount(0);
     await expect(agentsHeading).toHaveCount(0);
-    await expect(empty).toBeVisible();
+    // Closing the inspector removes it entirely (Room.tsx renders it only when
+    // a kind is open), so the closed state is its absence, not an empty panel.
+    await expect(empty).toHaveCount(0);
     await expect(page.locator('[data-inspector-body="thread"]')).toHaveCount(0);
     await page.screenshot({ path: resolve('docs/screenshots/thread-closed.png') });
 
@@ -96,14 +98,14 @@ test('a message opens a thread in the inspector and replies stay off the main st
     await expect(summary).toBeInViewport({ ratio: 1 });
     await expect(transcript.getByRole('button', { name: 'Reply', exact: true })).toHaveCount(0);
     await close.click();
-    await expect(empty).toBeVisible();
+    await expect(empty).toHaveCount(0);
     await page.screenshot({ path: resolve('docs/screenshots/thread-participants.png') });
     await summary.click();
     await expect(page.locator('.inspector-kind')).toHaveText('THREAD');
     await expect(page.locator('[data-inspector-body="thread"]')).toBeVisible();
 
     await close.click();
-    await expect(empty).toBeVisible();
+    await expect(empty).toHaveCount(0);
     await expect(page.locator('[data-inspector-body="thread"]')).toHaveCount(0);
     await expect(close).toHaveCount(0);
     await expect(teamHeading).toHaveCount(0);

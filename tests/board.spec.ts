@@ -1,5 +1,5 @@
 import { test, expect, type BrowserContext } from '@playwright/test';
-import { TASK_STATUSES, chipClass } from '@loop/types';
+import { TASK_STATUSES, chipClass, statusLabel } from '@loop/types';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -59,7 +59,7 @@ test('Board uses every shared status, updates live, opens the inspector, and tog
     await expect(doneColumn.locator('[data-task-id]')).toHaveCount(1);
     for (const [task, status] of [[tasks[0], 'queued'], [tasks[1], 'done']] as const) {
       const card = board.locator(`[data-task-id="${task.id}"]`);
-      await expect(card).toHaveText(`${task.title}Owner: ${task.owner}${status}`);
+      await expect(card).toHaveText(`${task.title}Owner: ${task.owner}${statusLabel(status)}`);
       await expect(card.locator('.tp-chip')).toHaveClass(chipClass(status));
       await card.click();
       await expect(page.locator('.inspector-title')).toHaveText(task.title);

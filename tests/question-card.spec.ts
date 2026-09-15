@@ -58,7 +58,7 @@ test('question card answers in the browser and the same task reaches done', asyn
     if (cardMessage.body.kind !== 'task') throw new Error('Expected task card');
     const colourCard = page.locator('.chat-task').filter({ hasText: 'ASK: what colour' });
     await expect(colourCard).toBeVisible();
-    await expect(colourCard.locator('.tp-chip')).toHaveText('needs_input', { timeout: 10_000 });
+    await expect(colourCard.locator('.tp-chip')).toHaveText('Needs you', { timeout: 10_000 });
     await expect(colourCard.locator('[data-task-question]')).toHaveText('what colour');
     await expect(colourCard).toHaveClass(/question-card/);
     const rail = page.locator('[data-needs-human]');
@@ -72,7 +72,7 @@ test('question card answers in the browser and the same task reaches done', asyn
     await page.getByLabel('Message', { exact: true }).press('Enter');
     await secondPost;
     const shapeCard = page.locator('.chat-task').filter({ hasText: 'ASK: what shape' });
-    await expect(shapeCard.locator('.tp-chip')).toHaveText('needs_input', { timeout: 10_000 });
+    await expect(shapeCard.locator('.tp-chip')).toHaveText('Needs you', { timeout: 10_000 });
     await expect(shapeCard.locator('[data-task-question]')).toHaveText('what shape');
     await expect(rail).toHaveAttribute('data-needs-human', '2');
     await expect(rail.locator('.needs-human-pill')).toHaveText('2');
@@ -83,12 +83,12 @@ test('question card answers in the browser and the same task reaches done', asyn
     const answered = page.waitForResponse((response) => response.url().includes('/answer') && response.request().method() === 'POST');
     await colourCard.getByRole('button', { name: 'Submit answer', exact: true }).click();
     expect((await answered).status()).toBe(200);
-    await expect(colourCard.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
+    await expect(colourCard.locator('.tp-chip')).toHaveText('Done', { timeout: 10_000 });
     await expect(colourCard.locator('[data-task-answer]')).toContainText('blue');
     // The answer is attributed to the composer's author, not a hardcoded name.
     await expect(colourCard.locator('[data-task-answer]')).toContainText('Moshe');
     await expect(colourCard.locator('[data-task-result]')).toHaveText('Answered: blue');
-    await expect(shapeCard.locator('.tp-chip')).toHaveText('needs_input');
+    await expect(shapeCard.locator('.tp-chip')).toHaveText('Needs you');
     await expect(shapeCard).toHaveClass(/question-card/);
     await expect(rail).toHaveAttribute('data-needs-human', '1');
     await expect(rail.locator('.needs-human-pill')).toHaveText('1');
@@ -104,7 +104,7 @@ test('question card answers in the browser and the same task reaches done', asyn
     const answeredShape = page.waitForResponse((response) => response.url().includes('/answer') && response.request().method() === 'POST');
     await shapeCard.getByRole('button', { name: 'Submit answer', exact: true }).click();
     expect((await answeredShape).status()).toBe(200);
-    await expect(shapeCard.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
+    await expect(shapeCard.locator('.tp-chip')).toHaveText('Done', { timeout: 10_000 });
     await expect(rail).toHaveAttribute('data-needs-human', '0');
     await expect(rail.locator('.needs-human-pill')).toHaveCount(0);
     await expect(page).not.toHaveTitle(/^\(\d+\) /);

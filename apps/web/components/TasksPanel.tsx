@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { TASK_STATUSES, chipClass, isActiveStatus, type Task } from '@loop/types';
+import { TASK_STATUSES, chipClass, isActiveStatus, statusLabel, type Task } from '@loop/types';
 import { actorLabel } from '../lib/api';
 import CreateTaskForm from './CreateTaskForm';
 
@@ -37,13 +37,13 @@ export default function TasksPanel({
     {view === 'board' ? <div className="task-board" role="region" aria-label="Task board" tabIndex={0}>
       {TASK_STATUSES.map((status) => {
         const columnTasks = tasks.filter((task) => task.status === status);
-        return <section className="task-board-column" key={status} data-task-status={status} aria-label={status}>
-          <h4>{status}<span className="muted">{columnTasks.length}</span></h4>
+        return <section className="task-board-column" key={status} data-task-status={status} aria-label={statusLabel(status)}>
+          <h4>{statusLabel(status)}<span className="muted">{columnTasks.length}</span></h4>
           {columnTasks.map((task) => <button type="button" className="task-board-card" key={task.id}
             data-task-id={task.id} aria-label={task.title} onClick={() => onSelectTask(task.id)}>
             <span className="task-board-title">{task.title}</span>
             <span className="task-board-owner">Owner: {actorLabel(task.owner, task.ownerPrincipalId)}</span>
-            <span className={chipClass(task.status)}>{task.status}</span>
+            <span className={chipClass(task.status)}>{statusLabel(task.status)}</span>
           </button>)}
           {!columnTasks.length && <p className="task-board-empty">No tasks</p>}
         </section>;
@@ -52,7 +52,7 @@ export default function TasksPanel({
       <thead><tr><th>Task</th><th>Owner</th><th>State</th></tr></thead>
       <tbody>{tasks.map((task) => <tr key={task.id} data-task-id={task.id}>
         <td><button className="task-title" onClick={() => onSelectTask(task.id)}>{task.title}</button></td>
-        <td>{actorLabel(task.owner, task.ownerPrincipalId)}</td><td><span className={chipClass(task.status)}>{task.status}</span></td>
+        <td>{actorLabel(task.owner, task.ownerPrincipalId)}</td><td><span className={chipClass(task.status)}>{statusLabel(task.status)}</span></td>
       </tr>)}</tbody>
     </table></div>}
     {!tasks.length && <p className="muted">No tasks yet. Create the first task above.</p>}

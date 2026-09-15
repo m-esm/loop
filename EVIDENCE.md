@@ -166,6 +166,9 @@ tests/rooms.spec.ts
 tests/smoke.spec.ts
 - smoke: a chat message appears and a short task finishes
 
+tests/status-label.spec.ts
+- no task status reaches the screen as its raw wire value
+
 tests/steering.spec.ts
 - room steering persists, pauses the runner, wraps up one turn, and stays out of threads
 

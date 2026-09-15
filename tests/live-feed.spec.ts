@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { once } from 'node:events';
-import { TASK_STATUSES, isRunningStatus, isActiveStatus, type Message, type Task, type TaskSnapshot } from '@loop/types';
+import { TASK_STATUSES, isRunningStatus, isActiveStatus, type Message, type Task, type TaskSnapshot, statusLabel } from '@loop/types';
 import { authedContext, seedSession, withAuth } from './auth';
 
 test('two tabs receive creates and status changes, then reconnect and replay after API restart', async ({ browser, request: raw }) => {
@@ -81,7 +81,7 @@ test('two tabs receive creates and status changes, then reconnect and replay aft
     await expect(chatCard).toContainText('Build the chat');
     const chatStatus = TASK_STATUSES.find(isRunningStatus)!;
     await request.patch(`${apiUrl}/tasks/${cardMessage.body.taskId}/status`, { data: { status: chatStatus } });
-    await expect(chatCard.locator('.tp-chip')).toHaveText(chatStatus);
+    await expect(chatCard.locator('.tp-chip')).toHaveText(statusLabel(chatStatus));
     await tabB.screenshot({ path: '/tmp/loop-chat.png' });
     for (let i = 0; i < 14; i++) {
       await request.post(`${apiUrl}/messages`, { data: { roomId: 'default', body: `History ${i}` } });
@@ -118,7 +118,7 @@ test('two tabs receive creates and status changes, then reconnect and replay aft
     const terminal = TASK_STATUSES.find((status) => !isActiveStatus(status))!;
     const patch = await request.patch(`${apiUrl}/tasks/${task.id}/status`, { data: { status: running } });
     expect(patch.status()).toBe(200);
-    await expect(row.getByText(running, { exact: true })).toBeVisible({ timeout: 1000 });
+    await expect(row.getByText(statusLabel(running), { exact: true })).toBeVisible({ timeout: 1000 });
     console.log(`API PATCH changed the task to ${running}; Tab B updated the existing row within 1 second.`);
     const cursor = (await (await request.get(`${apiUrl}/tasks`)).json() as TaskSnapshot).since;
     // Read while the API is still up. After the restart these rows must still be
@@ -144,7 +144,7 @@ test('two tabs receive creates and status changes, then reconnect and replay aft
     expect((await request.patch(`${apiUrl}/tasks/${task.id}/status`, { data: { status: terminal } })).status()).toBe(200);
     await Promise.all([a.setOffline(false), b.setOffline(false)]);
     await expect(tabB.getByRole('row').filter({ hasText: missedTask.title })).toHaveCount(1, { timeout: 35_000 });
-    await expect(row.getByText(terminal, { exact: true })).toBeVisible();
+    await expect(row.getByText(statusLabel(terminal), { exact: true })).toBeVisible();
     await expect(tabB.locator('[data-live]')).toHaveAttribute('data-live', '1');
     expect(streamUrls.some((url) => url.endsWith(`since=${cursor}`))).toBe(true);
     expect(await tabB.locator('tbody tr').count()).toBe(3);
@@ -165,7 +165,7 @@ test('two tabs receive creates and status changes, then reconnect and replay aft
     const thirdTask = await third.json() as Task;
     expect((await request.patch(`${apiUrl}/tasks/${thirdTask.id}/status`, { data: { status: running } })).status()).toBe(200);
     await expect(tabB.locator('tbody tr')).toHaveCount(4);
-    await expect(tabB.getByRole('row').filter({ hasText: thirdTask.title }).getByText(running, { exact: true })).toBeVisible();
+    await expect(tabB.getByRole('row').filter({ hasText: thirdTask.title }).getByText(statusLabel(running), { exact: true })).toBeVisible();
     await row.getByRole('button').click();
     await expect(tabB.getByRole('region', { name: 'Task detail' })).toBeVisible();
     await tabB.screenshot({ path: '/tmp/loop-tasks-list.png' });

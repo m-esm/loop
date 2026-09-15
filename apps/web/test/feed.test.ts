@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { INITIAL_STATUS, TASK_STATUSES, type Task, type TaskEvent } from '@loop/types';
+import { INITIAL_STATUS, TASK_STATUSES, statusLabel, type Task, type TaskEvent } from '@loop/types';
 import { applyTaskEvent, needsHumanCount, sseBackoffDelay } from '../lib/feed';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
@@ -33,7 +33,7 @@ test('mixed replay keeps messages unique and a task card renders the updated tas
   assert.equal(before.tasks[0].status, INITIAL_STATUS);
   assert.equal(after.messages, before.messages);
   const html = renderToStaticMarkup(createElement(MessageCard, { message: after.messages[0], task: after.tasks[0] }));
-  assert.ok(html.includes(TASK_STATUSES.at(-1)!));
+  assert.ok(html.includes(statusLabel(TASK_STATUSES.at(-1)!)));
   assert.ok(html.includes('Build'));
   const fileHtml = renderToStaticMarkup(createElement(MessageCard, {
     message: {

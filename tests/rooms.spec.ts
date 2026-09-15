@@ -175,7 +175,7 @@ test('a newly created room can run /task', async ({ browser, request: raw }) => 
     await page.getByLabel('Message', { exact: true }).fill('/task new room work :: it finishes');
     await page.getByRole('button', { name: 'Send' }).click();
     const card = page.locator('.chat-task').filter({ has: page.locator('h3', { hasText: 'new room work' }) });
-    await expect(card.locator('.tp-chip')).toHaveText('done', { timeout: 15_000 });
+    await expect(card.locator('.tp-chip')).toHaveText('Done', { timeout: 15_000 });
     await expect(card.locator('[data-task-result]')).toHaveText('room-ok');
   } finally {
     await Promise.all(contexts.map((item) => item.close()));

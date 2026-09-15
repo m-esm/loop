@@ -206,7 +206,11 @@ test('Files view shows an uploaded file and a member sees the file card', async 
     const row = page.locator('[data-file-row]');
     await expect(row).toBeVisible();
     await expect(row.getByText('brief.txt')).toBeVisible();
-    await expect(form.getByLabel('Upload file')).toBeInViewport({ ratio: 1 });
+    // The drop zone is the visible control; the native input is the a11y path,
+    // so assert the zone is reachable and the input is still operable.
+    await expect(form).toBeInViewport({ ratio: 1 });
+    await expect(form.getByRole('button', { name: 'browse', exact: true })).toBeVisible();
+    await expect(form.locator('[data-file-upload]')).toBeAttached();
     await expect(form.getByRole('button', { name: 'Upload', exact: true })).toBeInViewport({ ratio: 1 });
     await expect(row).toBeInViewport({ ratio: 1 });
     await page.screenshot({ path: resolve('docs/screenshots/files.png') });
