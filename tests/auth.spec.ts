@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { once } from 'node:events';
 import { cookieHeader, OPERATOR, seedSession } from './auth';
+import { captureFlow } from './capture';
 
 test('login form then the room after login', async ({ browser, request }) => {
   const dir = mkdtempSync(join(tmpdir(), 'loop-auth-ui-'));
@@ -55,7 +56,7 @@ test('login form then the room after login', async ({ browser, request }) => {
     await expect(page.getByRole('form', { name: 'Sign in' })).toBeVisible();
     // One frame at 1440x900, not a two-frame collage: a capture taller than the
     // viewport documents a page nobody sees at that size.
-    await page.screenshot({ path: resolve('docs/screenshots/auth.png') });
+    await captureFlow(page, 'auth');
 
     const signIn = page.getByRole('form', { name: 'Sign in' });
     await signIn.getByLabel('Email').fill(OPERATOR.email);

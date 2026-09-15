@@ -6,6 +6,7 @@ import { resolve, join } from 'node:path';
 import { once } from 'node:events';
 import type { Message } from '@loop/types';
 import { authedContext, seedSession, withAuth } from './auth';
+import { captureFlow } from './capture';
 
 test('question card answers in the browser and the same task reaches done', async ({ browser, request: raw }) => {
   const dir = mkdtempSync(join(tmpdir(), 'loop-ask-'));
@@ -98,7 +99,7 @@ test('question card answers in the browser and the same task reaches done', asyn
     await expect(shapeCard.getByLabel('Answer')).toBeInViewport({ ratio: 1 });
     await expect(shapeCard.getByRole('button', { name: 'Submit answer', exact: true })).toBeInViewport({ ratio: 1 });
 
-    await page.screenshot({ path: resolve('docs/screenshots/room-chat.png') });
+    await captureFlow(page, 'room-chat');
 
     await shapeCard.getByLabel('Answer').fill('circle');
     const answeredShape = page.waitForResponse((response) => response.url().includes('/answer') && response.request().method() === 'POST');

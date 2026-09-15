@@ -159,7 +159,12 @@ function generate(): string {
   const migrations = gitLines(['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'apps/api/migrations/*.sql']);
   // Same --others as migrations and specs: a screenshot written by the run that
   // regenerates this file is still untracked, so a tracked-only listing omits it.
-  const screenshots = gitLines(['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'docs/screenshots']).map((path) => `${path} ${pngSize(path)}`);
+  // The .json beside each user-flow capture records what was on screen when it
+  // was taken; it is the metric's evidence, not an image, so describe it as one.
+  const screenshots = gitLines(['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'docs/screenshots'])
+    .map((path) => (path.endsWith('.json')
+      ? `${path} capture facts`
+      : `${path} ${pngSize(path)}`));
   const insertHits: string[] = [];
   walkTs('apps', insertHits);
   walkTs('packages', insertHits);
