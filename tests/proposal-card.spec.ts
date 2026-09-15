@@ -93,9 +93,9 @@ test('proposal card approves, discusses, and rejects', async ({ browser, request
     const storeCard = page.locator('.chat-task').filter({ hasText: 'Pick a store' });
     const talkCard = page.locator('.chat-task').filter({ hasText: 'Talk it through' });
     const declineCard = page.locator('.chat-task').filter({ hasText: 'Decline this' });
-    await expect(storeCard.locator('.tp-chip')).toHaveText('needs_input', { timeout: 10_000 });
-    await expect(talkCard.locator('.tp-chip')).toHaveText('needs_input', { timeout: 10_000 });
-    await expect(declineCard.locator('.tp-chip')).toHaveText('needs_input', { timeout: 10_000 });
+    await expect(storeCard.locator('.tp-chip')).toHaveText('Needs you', { timeout: 10_000 });
+    await expect(talkCard.locator('.tp-chip')).toHaveText('Needs you', { timeout: 10_000 });
+    await expect(declineCard.locator('.tp-chip')).toHaveText('Needs you', { timeout: 10_000 });
     await expect(storeCard.locator('[data-task-proposal]')).toContainText('Which store?');
     await expect(storeCard.locator('[data-proposal-option="SQLite"] input')).toBeChecked();
     await expect(storeCard.locator('[data-proposal-option="SQLite"]')).toContainText("agent's pick");
@@ -133,9 +133,9 @@ test('proposal card approves, discusses, and rejects', async ({ browser, request
     const approved = page.waitForResponse((response) => response.url().includes('/decide') && response.request().method() === 'POST');
     await storeCard.getByRole('button', { name: 'Approve', exact: true }).click();
     expect((await approved).status()).toBe(200);
-    await expect(storeCard.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
+    await expect(storeCard.locator('.tp-chip')).toHaveText('Done', { timeout: 10_000 });
     await expect(storeCard.locator('[data-task-result]')).toHaveText('chose Postgres');
-    await expect(talkCard.locator('.tp-chip')).toHaveText('needs_input');
+    await expect(talkCard.locator('.tp-chip')).toHaveText('Needs you');
     await expect(talkCard.getByRole('button', { name: 'Discuss', exact: true })).toBeVisible();
 
     const discussed = page.waitForResponse((response) => response.url().includes('/decide') && response.request().method() === 'POST');
@@ -145,7 +145,7 @@ test('proposal card approves, discusses, and rejects', async ({ browser, request
     const requeued = await discussedResponse.json() as Task;
     expect(requeued.status).toBe('queued');
     expect(requeued.proposalChoice).toBe('discuss');
-    await expect(talkCard.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
+    await expect(talkCard.locator('.tp-chip')).toHaveText('Done', { timeout: 10_000 });
     await expect(talkCard.locator('[data-task-result]')).toHaveText('chose discuss');
 
     const parkedDecline = await (await request.get(`${apiUrl}/tasks/${declineId}`)).json() as Task;
@@ -161,7 +161,7 @@ test('proposal card approves, discusses, and rejects', async ({ browser, request
     expect(declined.status).toBe('failed');
     expect(declined.proposalChoice).toBe('reject');
     expect(declined.error).toBe('Proposal rejected by Moshe: SQLite');
-    await expect(declineCard.locator('.tp-chip')).toHaveText('failed');
+    await expect(declineCard.locator('.tp-chip')).toHaveText('Failed');
     await expect(declineCard.locator('[data-task-choice]')).toHaveText('Reject by Moshe');
     await expect(declineCard.locator('[data-task-error]')).toHaveText('Proposal rejected by Moshe: SQLite');
     await expect(declineCard.locator('[data-task-proposal]')).toBeVisible();

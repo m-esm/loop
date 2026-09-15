@@ -88,7 +88,7 @@ test('a spawned child shows lineage, stays linked after send-back', async ({ bro
     // filter, which is a strict mode violation resolving to both cards.
     const parentCard = page.locator('.chat-task')
       .filter({ has: page.locator('h3', { hasText: 'Break this down' }) });
-    await expect(parentCard.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
+    await expect(parentCard.locator('.tp-chip')).toHaveText('Done', { timeout: 10_000 });
     await expect(parentCard.locator('[data-task-result]')).toHaveText('parent-done');
 
     // expect.poll returns undefined, not the polled value, so read the row again
@@ -105,7 +105,7 @@ test('a spawned child shows lineage, stays linked after send-back', async ({ bro
     expect(child.agentId).toBe('echo');
 
     const childCard = page.locator('.chat-task').filter({ hasText: 'Review the split' });
-    await expect(childCard.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
+    await expect(childCard.locator('.tp-chip')).toHaveText('Done', { timeout: 10_000 });
     await expect(childCard.locator('[data-task-result]')).toHaveText('child-done');
     const lineage = childCard.locator('[data-task-parent]');
     await expect(lineage).toHaveText('From: Break this down');
@@ -128,7 +128,7 @@ test('a spawned child shows lineage, stays linked after send-back', async ({ bro
     const rejected = page.waitForResponse((response) => response.url().includes('/review') && response.request().method() === 'POST');
     await childCard.getByRole('button', { name: 'Reject', exact: true }).click();
     expect((await rejected).status()).toBe(200);
-    await expect(childCard.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
+    await expect(childCard.locator('.tp-chip')).toHaveText('Done', { timeout: 10_000 });
     await expect(childCard.locator('[data-task-result]')).toHaveText('child-resent tighten the split');
     await expect(childCard.locator('[data-task-parent]')).toHaveText('From: Break this down');
     const after = await (await request.get(`${apiUrl}/tasks/${child.id}`)).json() as Task;

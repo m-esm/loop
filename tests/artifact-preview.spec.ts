@@ -40,8 +40,9 @@ test('clicking a room file opens a closable artifact preview in the inspector', 
     const taskDetail = page.getByRole('region', { name: 'Task detail' });
     const artifactBody = page.locator('[data-inspector-body="artifact"]');
 
-    await expect(empty).toBeVisible();
-    await expect(empty).toHaveText('Pick a task, Team, Agents, or a thread.');
+    // Closing the inspector removes it entirely (Room.tsx renders it only when
+    // a kind is open), so the closed state is its absence, not an empty panel.
+    await expect(empty).toHaveCount(0);
     await expect(close).toHaveCount(0);
     await expect(artifactBody).toHaveCount(0);
     await expect(preview).toHaveCount(0);
@@ -81,7 +82,7 @@ test('clicking a room file opens a closable artifact preview in the inspector', 
     await page.screenshot({ path: resolve('docs/screenshots/artifact-preview-open.png') });
 
     await close.click();
-    await expect(empty).toBeVisible();
+    await expect(empty).toHaveCount(0);
     await expect(preview).toHaveCount(0);
     await expect(artifactBody).toHaveCount(0);
     await expect(close).toHaveCount(0);

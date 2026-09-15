@@ -67,7 +67,7 @@ test('an owner adds an agent from the catalog and a /task @name routes to it', a
     const cardMessage = await (await posted).json() as Message;
     if (cardMessage.body.kind !== 'task') throw new Error('Expected task card');
     const card = page.locator('.chat-task').filter({ hasText: 'Named scout' });
-    await expect(card.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
+    await expect(card.locator('.tp-chip')).toHaveText('Done', { timeout: 10_000 });
     await expect(card.locator('[data-task-result]')).toHaveText(probeToken);
     const task = await (await request.get(`${apiUrl}/tasks/${cardMessage.body.taskId}`)).json() as Task;
     expect(task.agentId).toBe('scout');

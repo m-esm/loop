@@ -370,7 +370,6 @@ function Inspector({
         <button type="button" aria-pressed={kind === 'team'} onClick={() => onKind('team')}>Team</button>
       </div>
       <div className="inspector-body" data-inspector-body={kind}>
-        {kind === 'closed' && <p className="inspector-empty">Pick a task, Team, or a thread.</p>}
         {kind === 'task' && (task
           ? <TaskDetail task={task} />
           : <p className="inspector-empty">Select a task to see its owner and definition of done.</p>)}

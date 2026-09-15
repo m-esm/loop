@@ -68,7 +68,7 @@ test('smoke: a chat message appears and a short task finishes', async ({ browser
     await page.getByLabel('Message', { exact: true }).fill('/task smoke work :: it finishes');
     await page.getByRole('button', { name: 'Send' }).click();
     const card = page.locator('.chat-task').filter({ has: page.locator('h3', { hasText: 'smoke work' }) });
-    await expect(card.locator('.tp-chip')).toHaveText('done', { timeout: 15_000 });
+    await expect(card.locator('.tp-chip')).toHaveText('Done', { timeout: 15_000 });
     await expect(card.locator('[data-task-result]')).toHaveText('smoke-ok');
 
     await context.close();

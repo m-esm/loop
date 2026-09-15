@@ -1,7 +1,7 @@
 'use client';
 
 import { useLayoutEffect, useRef, useState, type FormEvent } from 'react';
-import { chipClass, isActiveStatus, isRunningStatus, type Task } from '@loop/types';
+import { chipClass, isActiveStatus, isRunningStatus, statusLabel, type Task } from '@loop/types';
 import { actorLabel, api } from '../lib/api';
 
 export default function TaskCard({ task, tasks = [] }: { task: Task; tasks?: Task[] }) {
@@ -87,7 +87,7 @@ export default function TaskCard({ task, tasks = [] }: { task: Task; tasks?: Tas
     if (element && followLog.current) element.scrollTop = element.scrollHeight;
   }, [logText]);
   return <div className={waiting || proposing ? 'chat-task question-card' : 'chat-task'} data-task-id={task.id}>
-    <h3>{task.title}</h3><span className={chipClass(task.status)}>{task.status}</span>
+    <h3>{task.title}</h3><span className={chipClass(task.status)}>{statusLabel(task.status)}</span>
     {parentTitle && <p data-task-parent className="task-parent">From: {parentTitle}</p>}
     <p>Owner: {actorLabel(task.owner, task.ownerPrincipalId)}</p>
     {task.agentId && <p data-task-agent>Agent: {task.agentId}</p>}

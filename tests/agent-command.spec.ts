@@ -74,7 +74,7 @@ test('a /task finishes with stdout no one hardcoded', async ({ browser, request:
     const taskId = cardMessage.body.taskId;
     const card = page.locator('.chat-task').filter({ hasText: 'Probe the runtime' });
     await expect(card).toBeVisible();
-    await expect(card.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
+    await expect(card.locator('.tp-chip')).toHaveText('Done', { timeout: 10_000 });
     await expect(card.locator('[data-task-result]')).toHaveText(token);
     const task = await (await request.get(`${apiUrl}/tasks/${taskId}`)).json() as Task;
     expect(task.status).toBe('done');

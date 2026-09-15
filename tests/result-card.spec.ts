@@ -80,8 +80,8 @@ test('a finished task can be accepted or rejected and sent back with a note', as
 
     const keepCard = page.locator('.chat-task').filter({ hasText: 'Keep this' });
     const sendCard = page.locator('.chat-task').filter({ hasText: 'Send this back' });
-    await expect(keepCard.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
-    await expect(sendCard.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
+    await expect(keepCard.locator('.tp-chip')).toHaveText('Done', { timeout: 10_000 });
+    await expect(sendCard.locator('.tp-chip')).toHaveText('Done', { timeout: 10_000 });
     await expect(keepCard.locator('[data-task-result]')).toHaveText('first-pass');
     await expect(sendCard.locator('[data-task-result]')).toHaveText('first-pass');
     await expect(keepCard.getByRole('button', { name: 'Accept', exact: true })).toBeVisible();
@@ -94,7 +94,7 @@ test('a finished task can be accepted or rejected and sent back with a note', as
     await expect(keepCard.locator('[data-task-verdict]')).toHaveText('Accepted by Moshe');
     await expect(keepCard.getByRole('button', { name: 'Accept', exact: true })).toHaveCount(0);
     await expect(keepCard.getByRole('button', { name: 'Reject', exact: true })).toHaveCount(0);
-    await expect(keepCard.locator('.tp-chip')).toHaveText('done');
+    await expect(keepCard.locator('.tp-chip')).toHaveText('Done');
     await expect(sendCard.getByRole('button', { name: 'Reject', exact: true })).toBeVisible();
     // Visible is not reachable. A button half under the composer cannot be clicked.
     await expect(sendCard.getByRole('button', { name: 'Accept', exact: true })).toBeInViewport({ ratio: 1 });
@@ -118,7 +118,7 @@ test('a finished task can be accepted or rejected and sent back with a note', as
     // The rejected verdict is observable on the API response above. In the browser
     // the re-run may already be finishing, so asserting the intermediate state here
     // would race it; the post-rerun assertions below are the real proof.
-    await expect(sendCard.locator('.tp-chip')).toHaveText('done', { timeout: 10_000 });
+    await expect(sendCard.locator('.tp-chip')).toHaveText('Done', { timeout: 10_000 });
     await expect(sendCard.locator('[data-task-result]')).toHaveText('resent: too thin');
     // The re-run is a NEW unreviewed result: the old verdict must be gone and the
     // buttons must come back, or a sent-back task can never be accepted.

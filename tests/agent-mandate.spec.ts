@@ -53,7 +53,9 @@ test('an owner edits a room agent mandate in the inspector profile and it persis
     const profile = page.getByRole('region', { name: 'Agent profile' });
     const agentBody = page.locator('[data-inspector-body="agent"]');
 
-    await expect(empty).toBeVisible();
+    // Closing the inspector removes it entirely (Room.tsx renders it only when
+    // a kind is open), so the closed state is its absence, not an empty panel.
+    await expect(empty).toHaveCount(0);
     await expect(profile).toHaveCount(0);
     await expect(teamHeading).toHaveCount(0);
     await expect(agentsHeading).toHaveCount(0);
@@ -64,7 +66,8 @@ test('an owner edits a room agent mandate in the inspector profile and it persis
     await expect(agentBody).toHaveCount(1);
     await expect(profile).toBeVisible();
     await expect(profile.getByRole('form', { name: 'Edit mandate' })).toBeVisible();
-    await expect(agentsHeading).toHaveCount(0);
+    // Agents is a centre tab, so its heading stays while the inspector is open.
+    await expect(agentsHeading).toBeVisible();
     await expect(teamHeading).toHaveCount(0);
 
     await profile.getByRole('textbox', { name: 'Mandate' }).fill(MANDATE);
@@ -77,7 +80,7 @@ test('an owner edits a room agent mandate in the inspector profile and it persis
     await expect(page.locator('.inspector-kind')).toHaveText('AGENT');
     await expect(agentBody).toHaveCount(1);
     await expect(close).toBeVisible();
-    await expect(agentsHeading).toHaveCount(0);
+    await expect(agentsHeading).toBeVisible();
     await page.screenshot({ path: resolve('docs/screenshots/agent-mandate.png') });
 
     await page.reload();

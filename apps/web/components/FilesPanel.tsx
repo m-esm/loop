@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react';
 import type { RoomFile } from '@loop/types';
 import { API_URL, api } from '../lib/api';
 
@@ -62,22 +62,23 @@ export default function FilesPanel({ room, files, onChange, onSelectFile }: {
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [chosen, setChosen] = useState<string>('');
+  const [dragging, setDragging] = useState(false);
+  const input = useRef<HTMLInputElement | null>(null);
   const sending = useRef(false);
-  async function upload(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+
+  async function send(file: File | undefined) {
+    if (!file) { setError('Choose a file first.'); return; }
     if (sending.current) return;
-    const form = event.currentTarget;
-    const input = form.elements.namedItem('file') as HTMLInputElement | null;
-    const chosen = input?.files?.[0];
-    if (!chosen) { setError('Choose a file first.'); return; }
     sending.current = true;
     setBusy(true);
     setError('');
     try {
       const body = new FormData();
-      body.append('file', chosen);
+      body.append('file', file);
       await api(`/rooms/${room}/files`, { method: 'POST', body });
-      form.reset();
+      if (input.current) input.current.value = '';
+      setChosen('');
       onChange();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'File could not be uploaded.');
@@ -86,12 +87,45 @@ export default function FilesPanel({ room, files, onChange, onSelectFile }: {
       setBusy(false);
     }
   }
+
+  function upload(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void send(input.current?.files?.[0]);
+  }
+
+  // Dropping a file is the gesture people already expect here; the input stays
+  // as the keyboard and screen-reader path rather than being replaced by it.
+  function onDrop(event: DragEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setDragging(false);
+    const file = event.dataTransfer.files?.[0];
+    if (!file || !input.current) return;
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    input.current.files = transfer.files;
+    setChosen(file.name);
+  }
+
   return <section aria-label="Files">
-    <form className="files-upload" aria-label="Upload file" onSubmit={(event) => { void upload(event); }}>
-      <label htmlFor="room-file">Upload file</label>
-      <input id="room-file" name="file" type="file" disabled={busy} data-file-upload />
+    <form
+      className={`files-upload${dragging ? ' dragging' : ''}`}
+      aria-label="Upload file"
+      onSubmit={upload}
+      onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={onDrop}
+    >
+      <label htmlFor="room-file" className="files-upload-label">Upload file</label>
+      <p className="files-upload-hint">Drop a file here, or
+        {' '}<button type="button" className="files-upload-browse" disabled={busy}
+          onClick={() => input.current?.click()}>browse</button>.
+        {' '}Up to 10 MB.</p>
+      <input id="room-file" name="file" type="file" disabled={busy} data-file-upload
+        ref={input} className="files-upload-input"
+        onChange={(event) => { setChosen(event.target.files?.[0]?.name ?? ''); setError(''); }} />
+      <p className="files-upload-chosen" data-file-chosen>{chosen || 'No file chosen'}</p>
       {error && <p role="alert">{error}</p>}
-      <button type="submit" disabled={busy}>{busy ? 'Uploading...' : 'Upload'}</button>
+      <button type="submit" disabled={busy || !chosen}>{busy ? 'Uploading...' : 'Upload'}</button>
     </form>
     <ul className="files-list">
       {files.map((file) => <li key={file.id} data-file-row={file.id}>
@@ -100,6 +134,6 @@ export default function FilesPanel({ room, files, onChange, onSelectFile }: {
         <a href={`${API_URL}/rooms/${file.roomId}/files/${file.id}/content`} download={file.name}>Download</a>
       </li>)}
     </ul>
-    {!files.length && <p className="muted">No files yet. Upload a document for this room.</p>}
+    {!files.length && <p className="muted files-empty">No files yet. Drop one above to share it with this room and its agents.</p>}
   </section>;
 }
