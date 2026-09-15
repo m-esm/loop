@@ -1,10 +1,12 @@
 import { isFailureStatus, relativeAgo, type RoomSummary, type Task } from '@loop/types';
 import { needsHumanTasks } from '../lib/feed';
+import RoomActivity from './RoomActivity';
 
-export default function Inbox({ tasks, rooms, onSelect }: {
+export default function Inbox({ tasks, rooms, onSelect, onOpenRoom }: {
   tasks: Task[];
   rooms: RoomSummary[];
   onSelect: (task: Task) => void;
+  onOpenRoom: (id: string) => void;
 }) {
   const waiting = needsHumanTasks(tasks)
     .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt) || a.id.localeCompare(b.id));
@@ -12,7 +14,8 @@ export default function Inbox({ tasks, rooms, onSelect }: {
   // telling what the Inbox is for; an emptied queue is a human who cleared their
   // work and wants to know that, not an onboarding pitch.
   const firstRun = tasks.length === 0;
-  return <section aria-label="Inbox" className="inbox">
+  return <>
+    <section aria-label="Inbox" className="inbox">
     <h2>Needs you</h2>
     {waiting.length === 0 ? <div className="inbox-empty">
       <p className="inbox-empty-title">{firstRun ? 'Nothing needs you yet' : 'Nothing needs you'}</p>
@@ -47,5 +50,7 @@ export default function Inbox({ tasks, rooms, onSelect }: {
         </li>;
       })}
     </ol>}
-  </section>;
+    </section>
+    <RoomActivity tasks={tasks} rooms={rooms} onOpenRoom={onOpenRoom} />
+  </>;
 }
