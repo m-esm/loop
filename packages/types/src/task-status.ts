@@ -26,6 +26,11 @@ export function isActiveStatus(status: string): boolean {
 export function isRunningStatus(status: string): boolean {
   return isTaskStatus(status) && TASK_STATUS[status].running;
 }
+/** A terminal status that ended badly. Drives failure copy and colour in the
+ *  UI without any caller restating the status list. */
+export function isFailureStatus(status: string): boolean {
+  return isTaskStatus(status) && TASK_STATUS[status].chip === 'bad';
+}
 export function chipClass(status: string): string {
   return isTaskStatus(status) ? `tp-chip ${TASK_STATUS[status].chip}` : 'tp-chip';
 }
