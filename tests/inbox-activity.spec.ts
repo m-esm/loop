@@ -138,12 +138,28 @@ test('Home lists recent activity per room, newest first, and opens the room', as
  * the element that has to be on screen is the list's own box rather than its
  * last row, which sits inside that box and below its clip. The toggle is checked
  * with it: a reachable list behind an unreachable control is still broken.
+ *
+ * Bounding one list was never the whole contract. The queue above was still
+ * unbounded, so at sixteen parked it carried this whole section off the page on
+ * every viewport at once (list y=1254.9 with height 0, toggle bottom 1286.9, at
+ * 1440x900, 900x800 and 1440x700 alike) and no assertion here caught it, because
+ * four and eight parked both still fit. So the sixteen deep case runs the same
+ * body at the third viewport too, and adds the two things bounding a second box
+ * can break: a section floored at nothing, and parked work no longer reachable.
  */
-// One body, two queue depths. The titles below stay quoted literals because the
-// evidence generator reads them with a regex that only matches a quoted string,
-// so a template literal in a loop would drop this guard out of EVIDENCE.md.
+// One body, three queue depths. The titles below stay quoted literals because
+// the evidence generator reads them with a regex that only matches a quoted
+// string, so a template literal in a loop would drop this guard out of
+// EVIDENCE.md.
 async function keepsActivityListInsideViewport(
-  seed: { parked: number; parkPerRoom: number },
+  seed: {
+    parked: number;
+    parkPerRoom: number;
+    viewports?: { width: number; height: number }[];
+    // True at the depth where the queue is deeper than the box it is given, so
+    // the clip and the reachability of what it clips are both assertable.
+    queueClips?: boolean;
+  },
   browser: Browser,
   raw: APIRequestContext,
 ) {
@@ -223,6 +239,10 @@ async function keepsActivityListInsideViewport(
       const rows = activity.locator('[data-activity-room]');
       const list = page.locator('#room-activity-list');
       const toggle = activity.getByRole('button', { name: /rooms?$/ });
+      const heading = activity.getByRole('heading', { name: 'Room activity', exact: true });
+      const inbox = page.getByRole('region', { name: 'Inbox', exact: true });
+      const queue = inbox.locator('.inbox-list');
+      const queueRows = inbox.locator('[data-task-id]');
       const order = ['Launch', 'Billing', 'Research', 'Design', 'Infra', 'Support', 'Docs', 'Loop', 'Quiet'];
 
       // The extent instrument: where a rendered element actually ends on screen.
@@ -238,7 +258,7 @@ async function keepsActivityListInsideViewport(
         await page.evaluate(() => { const box = document.querySelector('main'); if (box) box.scrollTop = 0; });
       };
 
-      for (const viewport of [{ width: 1440, height: 900 }, { width: 900, height: 800 }]) {
+      for (const viewport of seed.viewports ?? [{ width: 1440, height: 900 }, { width: 900, height: 800 }]) {
         await page.setViewportSize(viewport);
         await page.goto('http://127.0.0.1:3100/');
         await expect(activity).toBeVisible();
@@ -256,13 +276,66 @@ async function keepsActivityListInsideViewport(
 
         // The assertions the fix exists to satisfy, ahead of every count and
         // label: where the shut list ends, and where its only escape hatch ends.
+        // The heading goes with them, because a section whose title is off the
+        // fold is not on screen in any sense a human would accept.
+        expect(await extent(heading)).toBeLessThanOrEqual(viewport.height);
         expect(await extent(list)).toBeLessThanOrEqual(viewport.height);
         expect(await extent(toggle)).toBeLessThanOrEqual(viewport.height);
+
+        // Starvation, the other half of bounding a box: a section squeezed to
+        // zero is bounded and useless, and an extent assertion alone is happy
+        // with it. At eight parked on 900x800 this list resolved to 8.19px,
+        // present and scrollable and too short for one row. The floor is not a
+        // constant this test carries: it reads the pitch off a row that is
+        // actually rendered, which is the same box the --inbox-row calc in
+        // globals.css is written from, so restyling the row moves the rule and
+        // this assertion together instead of leaving a number behind.
+        const rowPitch = await rows.first().evaluate((el) =>
+          el.getBoundingClientRect().height + parseFloat(getComputedStyle(el).marginBottom));
+        expect(rowPitch).toBeGreaterThan(0);
+        const listBox = await list.boundingBox();
+        if (!listBox) throw new Error('the measured element has no box');
+        expect(listBox.height).toBeGreaterThanOrEqual(rowPitch);
+
+        // Both sections are bounded now, so between them they stop growing the
+        // page instead of handing the overflow down to it.
+        expect(await page.evaluate(() => {
+          const box = document.querySelector('main') as HTMLElement;
+          return box.scrollHeight - box.clientHeight;
+        })).toBeLessThanOrEqual(0);
 
         // Shut, the list is a scrolling box rather than a truncated one, so every
         // room is present and the tail is reachable by scrolling it.
         await expect(rows).toHaveCount(9);
         expect(await list.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+
+        if (seed.queueClips) {
+          // The queue is bounded the same way, so at this depth it clips, and a
+          // clip is only acceptable if it is a scroll. Proving the scroll is
+          // proving no parked work was deleted from the page to make room.
+          const clip = await queue.evaluate((el) => ({ scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }));
+          expect(clip.scrollHeight).toBeGreaterThan(clip.clientHeight);
+          expect(await extent(queue)).toBeLessThanOrEqual(viewport.height);
+
+          // Reachability, task by task rather than by counting: every seeded row
+          // is scrolled to inside the queue's own box and has to land inside it,
+          // which is also inside the viewport because the box is.
+          await expect(queueRows).toHaveCount(seed.parked);
+          const queueBox = await queue.boundingBox();
+          if (!queueBox) throw new Error('the measured element has no box');
+          for (let n = 0; n < seed.parked; n += 1) {
+            const row = queueRows.nth(n);
+            await row.scrollIntoViewIfNeeded();
+            const rowBox = await row.boundingBox();
+            if (!rowBox) throw new Error('the measured element has no box');
+            expect(rowBox.y).toBeGreaterThanOrEqual(queueBox.y - 1);
+            expect(rowBox.y + rowBox.height).toBeLessThanOrEqual(queueBox.y + queueBox.height + 1);
+            expect(rowBox.y + rowBox.height).toBeLessThanOrEqual(viewport.height);
+          }
+          // Scrolling the queue is what moved, not the page under it.
+          await queue.evaluate((el) => { el.scrollTop = 0; });
+          await atTop();
+        }
 
         // A shut list names what it holds, and the count reads straight off the
         // room list rather than off a measurement.
@@ -328,6 +401,19 @@ test('Home keeps the room activity list and its toggle inside the viewport with 
 
 test('Home keeps the room activity list and its toggle inside the viewport with an eight deep queue', async ({ browser, request }) => {
   await keepsActivityListInsideViewport({ parked: 8, parkPerRoom: 2 }, browser, request);
+});
+
+test('Home keeps the room activity section on screen and scrolls a sixteen deep queue inside its own box', async ({ browser, request }) => {
+  await keepsActivityListInsideViewport({
+    parked: 16,
+    parkPerRoom: 4,
+    // The reviewer's depth, at all three of the viewports the reviewer measured
+    // it on. 1440x700 is the one four and eight parked never needed: it is short
+    // enough that both sections are bounded at once, so it is where a floor that
+    // only works on a tall viewport comes apart.
+    viewports: [{ width: 1440, height: 900 }, { width: 900, height: 800 }, { width: 1440, height: 700 }],
+    queueClips: true,
+  }, browser, request);
 });
 
 /**

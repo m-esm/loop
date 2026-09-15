@@ -317,22 +317,64 @@ nav .logout { margin-left: 12px; }
 .inbox-empty-body { font-size: 13px; line-height: 1.6; margin-bottom: 16px; }
 .inbox-empty-action { font-size: 13px; background: var(--accent); border-color: transparent; color: var(--text); }
 .inbox-empty-action:hover:not(:disabled) { background: var(--accent-hover); border-color: transparent; }
+/* One row of either Home list, in the terms the row above is declared in
+   rather than a number measured once and pasted back: 1px of border top and
+   bottom, 10px of padding top and bottom, the title line (.inbox-title, 14px
+   at line-height 1.35), the 2px grid row gap, the sub line (.inbox-sub, 12px
+   at the root line-height 1.5), and the 4px that separates one row from the
+   next. Chromium lays that out at 64.89px, which is the pitch a rendered list
+   actually repeats at, so the floor below is one whole row rather than a
+   rounded guess. Restyle the row and the floor follows it. */
+:root {
+  --inbox-row: calc(2px + 20px + (14px * 1.35) + 2px + (12px * 1.5) + 4px);
+  /* The heading over either list: .inbox h2 at 14px on the root line-height,
+     plus the 16px it is given below itself. h2 margin-top is already 0. */
+  --inbox-heading: calc((14px * 1.5) + 16px);
+  /* The control under the activity list: its 4px margin-top, the 1px button
+     border top and bottom, its 4px padding top and bottom, and a 12px label on
+     the root line-height. Chromium lays the button out at 28px. */
+  --room-activity-control: calc(4px + 2px + 8px + (12px * 1.5));
+}
+/* Neither section may be reduced to a box too short to show anything. A flex
+   item with min-height:0 shrinks to nothing, and that is not a bound, it is a
+   different way to lose the content: at eight parked on 900x800 the shut
+   activity list resolved to 8.19px, present and scrollable and useless. So each
+   section floors at its own heading plus one whole --inbox-row plus whatever
+   control sits under its list, every term taken from the box that renders it,
+   and box-sizing:border-box means the section's own padding-top counts too.
+   Nothing here is tuned against a queue depth or a viewport, so there is no
+   constant that a different depth or viewport can invalidate. */
 /* Room activity reuses the queue row's two-line grid, so both lists on Home
    scan at one density instead of reading as two different apps. The room name
    takes the title slot, the newest touch takes the time slot, and the counts
    take the sub line. */
 .room-activity { padding-top: 32px; }
+/* The queue owns its box the way the activity list below already owns its own.
+   main is already a 100vh flex column, and a flex item refuses to shrink past
+   its content until its min-height says so, which is the whole reason a deep
+   queue carried the section below it off the page: at sixteen parked the
+   activity list sat at y=1254.9 with height 0 and its toggle bottom at 1286.9,
+   at 1440x900, 900x800 and 1440x700 alike. PR 48 bounded the list underneath,
+   but only while the queue above it happened to fit. Now both sections shrink,
+   in proportion to what each is asking for, and each one scrolls inside what it
+   is left with. Parked work is never hidden by this, only scrolled to. */
+main > section[aria-label="Inbox"] { display: flex; flex-direction: column; min-height: calc(20px + var(--inbox-heading) + var(--inbox-row)); }
+main > section[aria-label="Inbox"] .inbox-list { flex: 1 1 auto; min-height: var(--inbox-row); overflow-y: auto; }
 /* The shut list owns its own box. main is already a 100vh flex column, so the
    section claims the space the "Needs you" queue leaves and the list scrolls
    inside it. That is what keeps the list bottom and the toggle on screen at any
-   queue depth and any viewport height, with no row count to tune. min-height:0
-   is what lets a flex item shrink past its content, the same idiom the Chat
-   section above already uses. */
-main > .room-activity { display: flex; flex-direction: column; min-height: 0; }
-main > .room-activity[data-expanded="false"] { flex: 1 1 auto; }
-main > .room-activity[data-expanded="false"] .inbox-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
-/* Open is the opt in: natural height, and Home scrolls to reach the tail. */
+   queue depth and any viewport height, with no row count to tune. min-content
+   is what lets a flex item shrink past its content while stopping at a height
+   that still shows a row, the same idiom the Chat section above uses with 0. */
+main > .room-activity { display: flex; flex-direction: column; }
+main > .room-activity[data-expanded="false"] { flex: 1 1 auto; min-height: calc(32px + var(--inbox-heading) + var(--inbox-row) + var(--room-activity-control)); }
+main > .room-activity[data-expanded="false"] .inbox-list { flex: 1 1 auto; min-height: var(--inbox-row); overflow-y: auto; }
+/* Open is the opt in: natural height, and Home scrolls to reach the tail. It is
+   one opt in for the whole column, so the queue releases its bound too. The
+   queue did not ask to be compressed to pay for an expansion below it, and the
+   human who opened the list asked for a scrolling page, not a shorter queue. */
 main > .room-activity[data-expanded="true"] { flex: 0 0 auto; }
+main:has(> .room-activity[data-expanded="true"]) > section[aria-label="Inbox"] { flex: 0 0 auto; }
 .room-activity-row:hover { border-color: var(--border); }
 .room-activity-name { color: var(--text); }
 .room-activity-summary { color: var(--secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
